@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b3d91">
+  <title>Fana G2014 – Kamper</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">⚽ Fana G2014</div>
+    <nav id="tabs" hidden>
+      <button data-view="matches" class="active">Kamper</button>
+      <button data-view="players">Spillere</button>
+      <button data-view="settings">Innstillinger</button>
+    </nav>
+    <button id="userBtn" class="ghost" hidden></button>
+  </header>
+
+  <div id="demoBanner" class="banner" hidden>
+    DEMO-modus: data lagres bare i denne nettleseren. Fyll inn Firebase i <code>js/config.js</code> for delt database.
+  </div>
+
+  <main>
+    <section id="login" class="view center" hidden>
+      <h1>Kampoversikt</h1>
+      <p>Fana G2014 Hvit og Rød</p>
+      <button id="loginBtn" class="primary big">Logg inn med Google</button>
+      <p id="loginError" class="error"></p>
+    </section>
+
+    <section id="matches" class="view" hidden>
+      <div class="toolbar">
+        <div class="seg" id="teamFilter">
+          <button data-team="" class="active">Alle</button>
+          <button data-team="Hvit">Hvit</button>
+          <button data-team="Rød">Rød</button>
+        </div>
+        <select id="statusFilter"><option value="">Alle statuser</option></select>
+        <label class="check"><input type="checkbox" id="showPast"> Vis tidligere</label>
+        <button id="newMatchBtn" class="primary">+ Ny kamp</button>
+      </div>
+      <div id="statusSummary" class="summary"></div>
+      <div id="matchList"></div>
+    </section>
+
+    <section id="players" class="view" hidden>
+      <form id="playerForm" class="toolbar">
+        <input id="playerName" placeholder="Navn" required>
+        <select id="playerTeam"></select>
+        <button class="primary">Legg til</button>
+      </form>
+      <div id="playerList"></div>
+    </section>
+
+    <section id="settings" class="view" hidden>
+      <div class="card">
+        <h3>Tilgang</h3>
+        <p class="muted">Google-kontoer (e-post) som kan se og redigere kamper. Én per linje.</p>
+        <textarea id="accessList" rows="6"></textarea>
+        <button id="saveAccess" class="primary">Lagre tilgang</button>
+        <span id="accessMsg" class="muted"></span>
+      </div>
+      <div class="card">
+        <h3>Importer fra Excel</h3>
+        <p class="muted">Velg vinterserie-arket (.xlsx). Kamper hentes fra arket «FANA», spillere og tropper fra «Laguttak»
+          og kontaktpersoner fra «Lag i serien». Kamper og spillere som allerede finnes blir ikke overskrevet.
+          Filen leses bare i nettleseren.</p>
+        <input type="file" id="importFile" accept=".xlsx,.xls">
+        <p id="importMsg" class="muted"></p>
+      </div>
+      <div class="card">
+        <h3>Eksport</h3>
+        <button id="exportCsv">Last ned kamper som CSV</button>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="matchDialog">
+    <form id="matchForm" method="dialog">
+      <h2 id="matchTitle">Kamp</h2>
+      <div class="grid">
+        <label>Lag<select name="team"></select></label>
+        <label>Status<select name="status"></select></label>
+        <label>Dato<input type="date" name="date"></label>
+        <label>Avspark<input type="time" name="time"></label>
+        <label>Oppmøte<input type="time" name="meetTime"></label>
+        <label>Type<select name="type">
+          <option>Seriekamp</option><option>Treningskamp</option><option>Cup</option><option>Annet</option>
+        </select></label>
+        <label class="wide">Motstander<input name="opponent" required></label>
+        <label>Hjemme/borte<select name="homeAway"><option>Hjemme</option><option>Borte</option></select></label>
+        <label>Bane<input name="venue" list="venueList"></label>
+        <label class="wide">Kontakt motstander<input name="contact" placeholder="Navn, telefon, e-post"></label>
+        <label class="wide">Notater<textarea name="notes" rows="3"></textarea></label>
+      </div>
+      <fieldset>
+        <legend>Kamptropp <span id="squadCount" class="muted"></span></legend>
+        <div id="squadPicker" class="squad"></div>
+      </fieldset>
+      <details id="logBox"><summary>Historikk</summary><ul id="logList"></ul></details>
+      <div class="actions">
+        <button type="button" id="deleteMatch" class="danger">Slett</button>
+        <span class="spacer"></span>
+        <button type="button" id="cancelMatch">Avbryt</button>
+        <button type="submit" class="primary">Lagre</button>
+      </div>
+    </form>
+  </dialog>
+  <datalist id="venueList"></datalist>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

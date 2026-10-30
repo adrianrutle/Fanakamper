@@ -1,0 +1,9 @@
+{
+  "name": "Fana G2014 Kamper",
+  "short_name": "Kamper",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f6fa",
+  "theme_color": "#0b3d91",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

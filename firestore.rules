@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner() {
+      return request.auth != null && request.auth.token.email == "adrian.rutle@gmail.com";
+    }
+    function isMember() {
+      return isOwner() || (request.auth != null &&
+        request.auth.token.email.lower() in get(/databases/$(database)/documents/config/access).data.emails);
+    }
+
+    match /config/access {
+      allow read, write: if isOwner();
+    }
+    match /matches/{id} {
+      allow read, write: if isMember();
+    }
+    match /players/{id} {
+      allow read, write: if isMember();
+    }
+  }
+}

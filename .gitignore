@@ -1,0 +1,5 @@
+.DS_Store
+# Excel-ark med personopplysninger skal ikke i det offentlige repoet
+*.xlsx
+*.xls
+*.csv
