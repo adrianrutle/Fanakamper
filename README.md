@@ -16,7 +16,9 @@ Appen kjører uavhengig av Claude – alt ligger i GitHub og Firebase under din 
 - Kamptropp velges fra spillerlisten (spillere fra eget lag vises først)
 - Historikk per kamp (hvem endret hva og når)
 - Filtrer på lag/status, vis tidligere kamper, eksport til CSV
-- Tilgangsliste: bare Google-kontoer du legger inn får se og redigere
+- Tilgang i to grupper (se under), håndhevet i databasereglene
+- Resultater og statistikk: tabell per lag, kamper per spiller/nivå og kampmatrise
+- Eksport til Spond (regneark i Spond-malens format, eller kalenderfil)
 - Kan legges til på hjemskjermen på mobil
 
 ## Oppsett (én gang, ca. 15 min)
@@ -36,8 +38,26 @@ Appen kjører uavhengig av Claude – alt ligger i GitHub og Firebase under din 
 
 ### 3. Første innlogging
 1. Logg inn med `adrian.rutle@gmail.com` (eieren, satt i `firestore.rules` og `js/config.js`).
-2. **Innstillinger → Tilgang**: legg inn e-posten til andre trenere/lagledere.
+2. **Innstillinger → Tilgang**: legg inn e-postene (Google-kontoer) i riktig gruppe.
 3. **Innstillinger → Importer fra Excel**: velg vinterserie-arket. Kamper (arket «FANA»), spillere og tropper («Laguttak») og kontaktpersoner («Lag i serien») lastes inn i databasen.
+
+## Tilgang og roller
+
+| Rolle | Hvem | Kan |
+|---|---|---|
+| Eier | `adrian.rutle@gmail.com` | Alt, inkludert å endre tilgangslistene |
+| Evalueringsgruppen | Lista «Evalueringsgruppen» | Sette opp tropper, redigere spillere, opprette/slette kamper, importere |
+| Øvrige | Lista «Øvrige» | Se alt, oppdatere kamper (status, tid, bane, resultat) – troppene er skrivebeskyttet |
+
+Listene lagres i dokumentet `config/access` og sjekkes av [firestore.rules](firestore.rules), så begrensningene gjelder også
+om noen prøver å gå rundt appen. Husk å publisere reglene på nytt i Firebase-konsollen når `firestore.rules` endres.
+
+## Eksport til Spond
+
+Spond har ingen åpen API for å opprette kamper, men sesongplanleggeren på web kan importere filer:
+**Innstillinger → Eksport til Spond** lager enten et regneark med samme kolonner som Spond-malen
+(`Startdato*`, `Starttidspunkt`, `Oppmøte`, … `Sted`) eller en kalenderfil (.ics). Velg lag hvis Hvit og Rød er egne Spond-grupper.
+I Spond: gruppen → Opprett arrangement → Sesongplanlegger → Importer. Troppene må fortsatt settes i Spond (invitasjoner).
 
 ## Import fra Excel
 

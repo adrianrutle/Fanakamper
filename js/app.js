@@ -1,6 +1,7 @@
 import * as store from "./store.js";
 import { TEAMS, STATUSES, OWNER_EMAIL } from "./config.js";
-import { parseWorkbook } from "./excel-import.js";
+import { parseWorkbook, loadXlsx } from "./excel-import.js";
+import { spondRows, toIcs } from "./spond.js";
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -8,8 +9,16 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const statusOf = (id) => STATUSES.find((s) => s.id === id) || STATUSES[0];
 const today = () => new Date().toISOString().slice(0, 10);
+const hasResult = (m) => m.goalsFor !== "" && m.goalsFor != null && m.goalsAgainst !== "" && m.goalsAgainst != null;
+// «S», «U» eller «T» sett fra Fana
+const outcome = (m) => {
+  const d = Number(m.goalsFor) - Number(m.goalsAgainst);
+  return d > 0 ? "S" : d < 0 ? "T" : "U";
+};
 
-const state = { user: null, matches: [], players: [], team: "", status: "", showPast: false, editing: null };
+const state = { user: null, matches: [], players: [], team: "", status: "", showPast: false, matrixTeam: "", editing: null, role: null, access: null };
+const canSquad = () => state.role === "owner" || state.role === "eval";
+const ROLE_LABEL = { owner: "Eier (full tilgang)", eval: "Evalueringsgruppen – kan sette opp tropper", reader: "Lesetilgang til tropper" };
 
 // ---------- Oppstart ----------
 fillSelect($("#statusFilter"), STATUSES.map((s) => [s.id, s.label]), true);
@@ -18,14 +27,13 @@ fillSelect($("#matchForm").team, TEAMS.map((t) => [t, t]));
 fillSelect($("#matchForm").status, STATUSES.map((s) => [s.id, s.label]));
 if (store.demoMode) $("#demoBanner").hidden = false;
 
-store.init(onUser).catch((e) => showLoginError(e));
 
 function fillSelect(sel, pairs, keepFirst = false) {
   if (!keepFirst) sel.innerHTML = "";
   for (const [v, l] of pairs) sel.add(new Option(l, v));
 }
 
-function onUser(user) {
+async function onUser(user) {
   state.user = user;
   $("#login").hidden = !!user;
   $("#tabs").hidden = !user;
@@ -33,9 +41,36 @@ function onUser(user) {
   if (!user) return;
   $("#userBtn").textContent = "Logg ut";
   $("#userBtn").title = user.email;
-  store.subscribe("matches", (list) => { state.matches = list; renderMatches(); }, onDbError);
-  store.subscribe("players", (list) => { state.players = list; renderPlayers(); }, onDbError);
+  await resolveRole();
+  store.subscribe("matches", (list) => { state.matches = list; renderMatches(); renderStats(); }, onDbError);
+  store.subscribe("players", (list) => {
+    state.players = list;
+    renderPlayers();
+    renderStats();
+    if (dlg.open && !$$("#squadPicker input").length) {
+      const m = state.matches.find((x) => x.id === state.editing);
+      renderSquadPicker(form.team.value, m?.squad || []);
+    }
+  }, onDbError);
   showView("matches");
+}
+
+// Rollen avgjøres av listene i config/access. Reglene i firestore.rules håndhever det samme på serveren.
+async function resolveRole() {
+  const email = state.user.email.toLowerCase();
+  try {
+    state.access = await store.get("config", "access");
+  } catch (e) {
+    state.access = null; // ingen tilgang til lista = ikke medlem (eier har alltid tilgang)
+  }
+  const a = state.access || {};
+  state.role = email === OWNER_EMAIL.toLowerCase() ? "owner"
+    : (a.evaluators || []).includes(email) ? "eval"
+    : (a.readers || []).includes(email) ? "reader" : null;
+  document.body.dataset.role = state.role || "none";
+  $("#roleInfo").innerHTML = state.role
+    ? `${esc(state.user.email)}: <span class="role">${ROLE_LABEL[state.role]}</span>`
+    : `${esc(state.user.email)} har ikke tilgang.`;
 }
 
 function onDbError(e) {
@@ -129,7 +164,8 @@ function matchCard(m) {
     </div>
     <div class="what">
       <div class="title"><span class="team team-${esc(m.team)}">${esc(m.team)}</span>
-        ${m.homeAway === "Borte" ? "@ " : "vs "}${esc(m.opponent || "?")}</div>
+        ${m.homeAway === "Borte" ? "@ " : "vs "}${esc(m.opponent || "?")}
+        ${hasResult(m) ? `<span class="score score-${outcome(m)}">${esc(m.goalsFor)}–${esc(m.goalsAgainst)}</span>` : ""}</div>
       <div class="meta">${esc(m.venue || "Bane ikke satt")} · ${esc(m.type || "")} · Tropp: ${squad}</div>
       <span class="status">${esc(s.label)}</span>
     </div>
@@ -171,6 +207,7 @@ function openMatch(id) {
   form.team.value = m.team || TEAMS[0];
   form.status.value = m.status || "planlagt";
   $("#deleteMatch").hidden = !id;
+  $("#resultOpponent").textContent = m.opponent || "Motstander";
   renderSquadPicker(m.team, m.squad || []);
   const log = m.log || [];
   $("#logBox").hidden = !log.length;
@@ -182,6 +219,7 @@ function openMatch(id) {
 }
 
 form.team.onchange = () => renderSquadPicker(form.team.value, selectedSquad());
+form.opponent.oninput = () => ($("#resultOpponent").textContent = form.opponent.value || "Motstander");
 
 function selectedSquad() {
   return $$("#squadPicker input:checked").map((i) => i.value);
@@ -196,9 +234,10 @@ function renderSquadPicker(team, chosen) {
     $("#squadPicker").innerHTML = `<p class="muted">Legg til spillere under «Spillere» først.</p>`;
   } else {
     $("#squadPicker").innerHTML = players.map((p) => `
-      <label class="${own(p) ? "" : "other"}"><input type="checkbox" value="${p.id}" ${set.has(p.id) ? "checked" : ""}>
+      <label class="${own(p) ? "" : "other"}"><input type="checkbox" value="${p.id}" ${set.has(p.id) ? "checked" : ""} ${canSquad() ? "" : "disabled"}>
         ${esc(p.name)}${own(p) ? "" : ` <small>(${esc(p.team)})</small>`}</label>`).join("");
   }
+  $("#squadLocked").hidden = canSquad();
   const count = () => ($("#squadCount").textContent = `(${selectedSquad().length} valgt)`);
   $$("#squadPicker input").forEach((i) => (i.onchange = count));
   count();
@@ -208,10 +247,18 @@ form.onsubmit = async (e) => {
   e.preventDefault();
   const data = {};
   for (const el of form.elements) if (el.name) data[el.name] = el.value.trim();
-  data.squad = selectedSquad();
-  data.updatedAt = new Date().toISOString();
   const old = state.editing ? state.matches.find((x) => x.id === state.editing) : null;
+  // Var spillerlisten ikke lastet da kampen ble åpnet, finnes ingen avkrysningsbokser – behold da troppen
+  data.squad = canSquad() && $$("#squadPicker input").length ? selectedSquad() : (old?.squad || []);
+  data.updatedAt = new Date().toISOString();
   const log = [...(old?.log || [])];
+  if (hasResult(data)) {
+    // Et registrert resultat betyr at kampen er spilt
+    if (data.status !== "avlyst") data.status = "spilt";
+    if (!old || !hasResult(old) || old.goalsFor !== data.goalsFor || old.goalsAgainst !== data.goalsAgainst) {
+      log.push(logEntry(`Resultat ${data.goalsFor}–${data.goalsAgainst}`));
+    }
+  }
   if (!old) log.push(logEntry(`Opprettet (${statusOf(data.status).label})`));
   else if (old.status !== data.status) log.push(logEntry(`Status → ${statusOf(data.status).label}`));
   else log.push(logEntry("Endret"));
@@ -226,6 +273,69 @@ $("#deleteMatch").onclick = async () => {
   await store.remove("matches", state.editing);
   dlg.close();
 };
+
+// ---------- Statistikk ----------
+$$("#matrixTeam button").forEach((b) => (b.onclick = () => {
+  state.matrixTeam = b.dataset.team;
+  $$("#matrixTeam button").forEach((x) => x.classList.toggle("active", x === b));
+  renderStats();
+}));
+
+function renderStats() {
+  const active = state.matches.filter((m) => m.status !== "avlyst")
+    .sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+
+  // Resultater per lag
+  const rows = [...TEAMS, "Totalt"].map((t) => {
+    const ms = active.filter((m) => hasResult(m) && (t === "Totalt" || m.team === t));
+    const c = { S: 0, U: 0, T: 0 };
+    let gf = 0, ga = 0;
+    for (const m of ms) { c[outcome(m)]++; gf += Number(m.goalsFor); ga += Number(m.goalsAgainst); }
+    const form = ms.slice(-5).map((m) => `<span class="score score-${outcome(m)}">${outcome(m)}</span>`).join("");
+    return `<tr><th>${t === "Totalt" ? t : `<span class="team team-${t}">${t}</span>`}</th>
+      <td>${ms.length}</td><td>${c.S}</td><td>${c.U}</td><td>${c.T}</td>
+      <td>${gf}–${ga}</td><td>${gf - ga > 0 ? "+" : ""}${gf - ga}</td><td class="form">${form}</td></tr>`;
+  }).join("");
+  const played = active.filter(hasResult).reverse();
+  $("#resultStats").innerHTML = `<div class="table-wrap"><table class="stats">
+      <tr><th></th><th>K</th><th>S</th><th>U</th><th>T</th><th>Mål</th><th>+/-</th><th>Siste 5</th></tr>${rows}</table></div>
+    ${played.length ? `<ul class="results">${played.map((m) => `<li>
+      <span class="muted">${dayLabel(m.date)}</span>
+      <span class="team team-${esc(m.team)}">${esc(m.team)}</span>
+      ${m.homeAway === "Borte" ? "@" : "vs"} ${esc(m.opponent)}
+      <span class="score score-${outcome(m)}">${esc(m.goalsFor)}–${esc(m.goalsAgainst)}</span></li>`).join("")}</ul>`
+      : `<p class="muted">Ingen resultater registrert ennå. Åpne en kamp og fyll inn resultatet.</p>`}`;
+
+  // Spillere: antall kamper per nivå
+  const levelOrder = { Hvit: 0, Rød: 1, Begge: 2 };
+  const players = state.players.slice().sort((a, b) =>
+    (levelOrder[a.team] - levelOrder[b.team]) || a.name.localeCompare(b.name, "no"));
+  const count = (p, pred) => active.filter((m) => (m.squad || []).includes(p.id) && pred(m)).length;
+  $("#playerStats").innerHTML = `<tr><th>Spiller</th><th>Nivå</th>
+      ${TEAMS.map((t) => `<th><span class="team team-${t}">${t}</span></th>`).join("")}
+      <th>Totalt</th><th>Spilt</th></tr>` +
+    players.map((p) => {
+      const per = TEAMS.map((t) => count(p, (m) => m.team === t));
+      const total = per.reduce((a, b) => a + b, 0);
+      return `<tr class="${total ? "" : "zero"}"><th>${esc(p.name)}</th><td>${esc(p.team)}</td>
+        ${per.map((n) => `<td>${n || ""}</td>`).join("")}
+        <td><b>${total}</b></td><td>${count(p, (m) => m.status === "spilt") || ""}</td></tr>`;
+    }).join("");
+
+  // Matrise: spillere × kamper
+  const cols = active.filter((m) => !state.matrixTeam || m.team === state.matrixTeam);
+  $("#matrix").innerHTML = `<tr><th>Spiller</th>${cols.map((m) =>
+      `<th class="col team-col-${esc(m.team)}" title="${esc(m.team)} – ${esc(m.opponent)}">
+        ${m.date ? m.date.slice(8, 10) + "." + m.date.slice(5, 7) : "?"}<br><small>${esc(m.team[0])}</small></th>`).join("")}
+      <th>Σ</th></tr>` +
+    players.map((p) => {
+      const cells = cols.map((m) => (m.squad || []).includes(p.id));
+      const n = cells.filter(Boolean).length;
+      if (!n && state.matrixTeam && p.team !== state.matrixTeam) return "";
+      return `<tr class="${n ? "" : "zero"}"><th>${esc(p.name)}</th>${cells.map((on, i) =>
+        `<td class="${on ? "on team-col-" + esc(cols[i].team) : ""}">${on ? "●" : ""}</td>`).join("")}<td><b>${n}</b></td></tr>`;
+    }).join("");
+}
 
 // ---------- Spillere ----------
 $("#playerForm").onsubmit = async (e) => {
@@ -243,9 +353,9 @@ function renderPlayers() {
     return `<div class="card"><h3>${esc(t)} <span class="muted">(${ps.length})</span></h3>
       <ul class="players">${ps.map((p) => `<li>
         <span>${esc(p.name)}</span>
-        <select data-id="${p.id}">${[...TEAMS, "Begge"].map((x) =>
+        <select data-id="${p.id}" ${canSquad() ? "" : "disabled"}>${[...TEAMS, "Begge"].map((x) =>
           `<option ${x === p.team ? "selected" : ""}>${x}</option>`).join("")}</select>
-        <button class="ghost del" data-id="${p.id}" title="Fjern">✕</button></li>`).join("")}</ul></div>`;
+        <button class="ghost del eval-only" data-id="${p.id}" title="Fjern">✕</button></li>`).join("")}</ul></div>`;
   }).join("");
   $("#playerList").innerHTML = groups || `<p class="muted center">Ingen spillere ennå.</p>`;
   $$("#playerList select").forEach((s) => (s.onchange = () => store.update("players", s.dataset.id, { team: s.value })));
@@ -256,19 +366,24 @@ function renderPlayers() {
 
 // ---------- Innstillinger ----------
 async function loadAccess() {
-  try {
-    const doc = await store.get("config", "access");
-    $("#accessList").value = (doc?.emails || []).join("\n");
-  } catch (e) {
-    $("#accessMsg").textContent = "Kun eier kan se/endre tilgang.";
-  }
+  if (state.role !== "owner") return;
+  const doc = await store.get("config", "access").catch(() => null);
+  $("#accessEval").value = (doc?.evaluators || []).join("\n");
+  $("#accessRead").value = (doc?.readers || []).join("\n");
 }
 
+const parseEmails = (text) =>
+  [...new Set(text.split(/[\s,;]+/).map((s) => s.trim().toLowerCase()).filter((s) => s.includes("@")))];
+
 $("#saveAccess").onclick = async () => {
-  const emails = $("#accessList").value.split(/[\s,;]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const evaluators = parseEmails($("#accessEval").value);
+  // Står noen i begge lister, gjelder evalueringsgruppen
+  const readers = parseEmails($("#accessRead").value).filter((e) => !evaluators.includes(e));
   try {
-    await store.add("config", { emails }, "access");
-    $("#accessMsg").textContent = "Lagret ✓";
+    await store.add("config", { evaluators, readers }, "access");
+    $("#accessEval").value = evaluators.join("\n");
+    $("#accessRead").value = readers.join("\n");
+    $("#accessMsg").textContent = `Lagret ✓ (${evaluators.length} i evalueringsgruppen, ${readers.length} øvrige)`;
   } catch (e) {
     $("#accessMsg").textContent = "Kunne ikke lagre: " + e.message;
   }
@@ -312,6 +427,36 @@ $("#importFile").onchange = async (e) => {
   e.target.value = "";
 };
 
+// ---------- Eksport til Spond ----------
+function spondMatches() {
+  const team = $("#spondTeam").value;
+  return state.matches
+    .filter((m) => m.status !== "avlyst" && m.date && (!team || m.team === team))
+    .filter((m) => $("#spondPast").checked || m.date >= today())
+    .sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+}
+
+function download(blob, filename) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+const spondName = (ext) => `spond-${$("#spondTeam").value || "alle"}-${today()}.${ext}`.toLowerCase().replace("ø", "o");
+
+$("#exportSpondXlsx").onclick = async () => {
+  const XLSX = await loadXlsx();
+  const ws = XLSX.utils.aoa_to_sheet(spondRows(spondMatches()), { cellDates: true, dateNF: "dd\\.mm\\.yyyy" });
+  ws["!cols"] = [12, 14, 10, 12, 14, 12, 24, 24, 30, 20].map((wch) => ({ wch }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Kamper");
+  XLSX.writeFile(wb, spondName("xlsx"));
+};
+
+$("#exportSpondIcs").onclick = () =>
+  download(new Blob([toIcs(spondMatches())], { type: "text/calendar" }), spondName("ics"));
+
 $("#exportCsv").onclick = () => {
   const cols = ["team", "status", "date", "time", "meetTime", "type", "opponent", "homeAway", "venue", "contact", "notes"];
   const name = (id) => state.players.find((p) => p.id === id)?.name || id;
@@ -329,3 +474,6 @@ $("#exportCsv").onclick = () => {
 if ("serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
+
+// Start til slutt, så alle funksjoner og variabler over er klare
+store.init(onUser).catch((e) => showLoginError(e));

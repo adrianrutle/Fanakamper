@@ -15,6 +15,7 @@
     <div class="brand">⚽ Fana G2014</div>
     <nav id="tabs" hidden>
       <button data-view="matches" class="active">Kamper</button>
+      <button data-view="stats">Statistikk</button>
       <button data-view="players">Spillere</button>
       <button data-view="settings">Innstillinger</button>
     </nav>
@@ -42,14 +43,31 @@
         </div>
         <select id="statusFilter"><option value="">Alle statuser</option></select>
         <label class="check"><input type="checkbox" id="showPast"> Vis tidligere</label>
-        <button id="newMatchBtn" class="primary">+ Ny kamp</button>
+        <button id="newMatchBtn" class="primary eval-only">+ Ny kamp</button>
       </div>
       <div id="statusSummary" class="summary"></div>
       <div id="matchList"></div>
     </section>
 
+    <section id="stats" class="view" hidden>
+      <h3>Resultater</h3>
+      <div id="resultStats"></div>
+      <h3>Spillere – kamper per nivå</h3>
+      <p class="muted">Teller kamper spilleren er tatt ut til (avlyste kamper telles ikke). «Spilt» er kamper med status Spilt.</p>
+      <div class="table-wrap"><table id="playerStats" class="stats"></table></div>
+      <h3>Kampmatrise</h3>
+      <div class="toolbar">
+        <div class="seg" id="matrixTeam">
+          <button data-team="" class="active">Alle</button>
+          <button data-team="Hvit">Hvit</button>
+          <button data-team="Rød">Rød</button>
+        </div>
+      </div>
+      <div class="table-wrap"><table id="matrix" class="stats matrix"></table></div>
+    </section>
+
     <section id="players" class="view" hidden>
-      <form id="playerForm" class="toolbar">
+      <form id="playerForm" class="toolbar eval-only">
         <input id="playerName" placeholder="Navn" required>
         <select id="playerTeam"></select>
         <button class="primary">Legg til</button>
@@ -59,13 +77,24 @@
 
     <section id="settings" class="view" hidden>
       <div class="card">
+        <h3>Din tilgang</h3>
+        <p id="roleInfo"></p>
+      </div>
+      <div class="card owner-only">
         <h3>Tilgang</h3>
-        <p class="muted">Google-kontoer (e-post) som kan se og redigere kamper. Én per linje.</p>
-        <textarea id="accessList" rows="6"></textarea>
+        <p class="muted">Google-kontoer (e-post), én per linje. Alle her kan se kamper, tropper og statistikk.</p>
+        <div class="access-grid">
+          <label><b>Evalueringsgruppen</b>
+            <span class="muted">Kan sette opp tropper, redigere spillere, opprette/slette kamper og importere.</span>
+            <textarea id="accessEval" rows="8" placeholder="navn@gmail.com"></textarea></label>
+          <label><b>Øvrige</b>
+            <span class="muted">Kan oppdatere kamper (status, tid, bane, resultat) – men troppene er skrivebeskyttet.</span>
+            <textarea id="accessRead" rows="8" placeholder="navn@gmail.com"></textarea></label>
+        </div>
         <button id="saveAccess" class="primary">Lagre tilgang</button>
         <span id="accessMsg" class="muted"></span>
       </div>
-      <div class="card">
+      <div class="card eval-only">
         <h3>Importer fra Excel</h3>
         <p class="muted">Velg vinterserie-arket (.xlsx). Kamper hentes fra arket «FANA», spillere og tropper fra «Laguttak»
           og kontaktpersoner fra «Lag i serien». Kamper og spillere som allerede finnes blir ikke overskrevet.
@@ -74,7 +103,21 @@
         <p id="importMsg" class="muted"></p>
       </div>
       <div class="card">
-        <h3>Eksport</h3>
+        <h3>Eksport til Spond</h3>
+        <p class="muted">Spond (web) → gruppen → Opprett arrangement → Sesongplanlegger → Importer.
+          Bruk regnearket, eller kalenderfilen hvis regnearket ikke godtas. Lag én fil per lag hvis Hvit og Rød er egne Spond-grupper.
+          Avlyste kamper er ikke med.</p>
+        <div class="toolbar">
+          <select id="spondTeam"><option value="">Begge lag</option><option>Hvit</option><option>Rød</option></select>
+          <label class="check"><input type="checkbox" id="spondPast"> Ta med tidligere kamper</label>
+        </div>
+        <div class="toolbar">
+          <button id="exportSpondXlsx" class="primary">Last ned regneark (.xlsx)</button>
+          <button id="exportSpondIcs">Last ned kalender (.ics)</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Annen eksport</h3>
         <button id="exportCsv">Last ned kamper som CSV</button>
       </div>
     </section>
@@ -89,6 +132,7 @@
         <label>Dato<input type="date" name="date"></label>
         <label>Avspark<input type="time" name="time"></label>
         <label>Oppmøte<input type="time" name="meetTime"></label>
+        <label>Slutt<input type="time" name="endTime"></label>
         <label>Type<select name="type">
           <option>Seriekamp</option><option>Treningskamp</option><option>Cup</option><option>Annet</option>
         </select></label>
@@ -99,12 +143,21 @@
         <label class="wide">Notater<textarea name="notes" rows="3"></textarea></label>
       </div>
       <fieldset>
+        <legend>Resultat</legend>
+        <div class="result-input">
+          <label>Fana<input type="number" name="goalsFor" min="0" inputmode="numeric"></label>
+          <span>–</span>
+          <label><span id="resultOpponent">Motstander</span><input type="number" name="goalsAgainst" min="0" inputmode="numeric"></label>
+        </div>
+      </fieldset>
+      <fieldset>
         <legend>Kamptropp <span id="squadCount" class="muted"></span></legend>
+        <p id="squadLocked" class="muted" hidden>🔒 Bare evalueringsgruppen kan endre troppen.</p>
         <div id="squadPicker" class="squad"></div>
       </fieldset>
       <details id="logBox"><summary>Historikk</summary><ul id="logList"></ul></details>
       <div class="actions">
-        <button type="button" id="deleteMatch" class="danger">Slett</button>
+        <button type="button" id="deleteMatch" class="danger eval-only">Slett</button>
         <span class="spacer"></span>
         <button type="button" id="cancelMatch">Avbryt</button>
         <button type="submit" class="primary">Lagre</button>

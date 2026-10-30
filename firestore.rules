@@ -1,22 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Tilgang styres av dokumentet config/access:
+    //   evaluators: [e-poster]  – evalueringsgruppen: tropper, spillere, opprette/slette kamper
+    //   readers:    [e-poster]  – øvrige: kan se alt og oppdatere kamper, men ikke endre tropper
+    function email() {
+      return request.auth.token.email.lower();
+    }
     function isOwner() {
-      return request.auth != null && request.auth.token.email == "adrian.rutle@gmail.com";
+      return request.auth != null && email() == "adrian.rutle@gmail.com";
+    }
+    function access() {
+      return get(/databases/$(database)/documents/config/access).data;
+    }
+    function isEval() {
+      return isOwner() || (request.auth != null && email() in access().get("evaluators", []));
     }
     function isMember() {
-      return isOwner() || (request.auth != null &&
-        request.auth.token.email.lower() in get(/databases/$(database)/documents/config/access).data.emails);
+      return isEval() || (request.auth != null && email() in access().get("readers", []));
     }
 
     match /config/access {
-      allow read, write: if isOwner();
+      allow read: if isMember();
+      allow write: if isOwner();
     }
     match /matches/{id} {
-      allow read, write: if isMember();
+      allow read: if isMember();
+      allow create, delete: if isEval();
+      allow update: if isEval() ||
+        (isMember() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["squad"]));
     }
     match /players/{id} {
-      allow read, write: if isMember();
+      allow read: if isMember();
+      allow write: if isEval();
     }
   }
 }

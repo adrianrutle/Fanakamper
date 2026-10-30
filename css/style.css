@@ -84,3 +84,44 @@ fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 12px 0; }
   .match .what { flex: 0 0 calc(100% - 104px); }
   .match .next { margin-left: 104px; }
 }
+
+/* Resultat */
+.result-input { display: flex; align-items: flex-end; gap: 10px; }
+.result-input label { flex: 1; display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--muted); }
+.result-input > span { padding-bottom: 8px; font-weight: 700; }
+.score { display: inline-block; min-width: 1.6em; text-align: center; font-size: 12px; font-weight: 700;
+  padding: 1px 6px; border-radius: 4px; margin-left: 6px; color: #fff; background: #64748b; }
+.score-S { background: #16a34a; }
+.score-T { background: #dc2626; }
+.score-U { background: #d97706; }
+.form .score { margin-left: 2px; }
+.results { list-style: none; padding: 0; margin: 8px 0 16px; }
+.results li { padding: 6px 0; border-top: 1px solid var(--line); }
+
+/* Statistikktabeller */
+.table-wrap { overflow-x: auto; margin-bottom: 12px; background: var(--card); border-radius: 10px; }
+table.stats { border-collapse: collapse; width: 100%; font-size: 13px; }
+.stats th, .stats td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: center; white-space: nowrap; }
+.stats tr > th:first-child { text-align: left; position: sticky; left: 0; background: var(--card); z-index: 1; }
+.stats tr.zero { color: var(--muted); }
+.matrix th.col { font-weight: 600; font-size: 11px; line-height: 1.2; }
+.matrix td { padding: 4px; min-width: 32px; }
+.team-col-Hvit { background: rgba(148, 163, 184, .18); }
+.team-col-Rød { background: rgba(220, 38, 38, .14); }
+.matrix td.on { font-size: 14px; }
+.matrix td.on.team-col-Hvit { color: var(--text); background: rgba(148, 163, 184, .45); }
+.matrix td.on.team-col-Rød { color: #dc2626; background: rgba(220, 38, 38, .25); }
+
+@media (max-width: 480px) {
+  .topbar { gap: 4px 12px; }
+  .topbar #userBtn { margin-left: auto; }
+  .topbar nav { order: 3; flex-basis: 100%; overflow-x: auto; }
+}
+
+/* Roller: skjul det brukeren ikke har lov til */
+body:not([data-role="owner"]) .owner-only,
+body[data-role="reader"] .eval-only { display: none !important; }
+.access-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.access-grid label { display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 640px) { .access-grid { grid-template-columns: 1fr; } }
+.role { display: inline-block; padding: 2px 8px; border-radius: 99px; background: var(--accent); color: #fff; font-size: 13px; }

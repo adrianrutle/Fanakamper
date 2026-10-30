@@ -8,7 +8,7 @@ const XLSX_URL = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.m
 const LEVEL_TEAM = { 1: "Hvit", 2: "Rød" };
 const CLUB = "Fana G2014";
 
-function loadXlsx() {
+export function loadXlsx() {
   if (window.XLSX) return Promise.resolve(window.XLSX);
   return new Promise((ok, fail) => {
     const s = document.createElement("script");
@@ -80,6 +80,7 @@ export async function parseWorkbook(buf) {
       team, date,
       time: toTime(r[1]),
       meetTime: toTime(r[2]),
+      endTime: toTime(r[4]),
       type: clean(r[5]) || "Seriekamp",
       opponent,
       homeAway: isHome ? "Hjemme" : "Borte",
