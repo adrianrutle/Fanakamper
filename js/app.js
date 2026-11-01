@@ -1,6 +1,6 @@
 import * as store from "./store.js";
 import { TEAMS, STATUSES, OWNER_EMAIL } from "./config.js";
-import { parseWorkbook, loadXlsx } from "./excel-import.js";
+import { parseWorkbook, loadXlsx, FIRST_UNPLANNED } from "./excel-import.js";
 import { spondRows, toIcs } from "./spond.js";
 
 const $ = (s) => document.querySelector(s);
@@ -18,6 +18,7 @@ const outcome = (m) => {
 
 const state = { user: null, matches: [], players: [], team: "", status: "", showPast: false, matrixTeam: "", editing: null, role: null, access: null };
 const canSquad = () => state.role === "owner" || state.role === "eval";
+const SPILT = STATUSES.findIndex((s) => s.id === "spilt");
 const ROLE_LABEL = { owner: "Eier (full tilgang)", eval: "Evalueringsgruppen – kan sette opp tropper", reader: "Lesetilgang til tropper" };
 
 // ---------- Oppstart ----------
@@ -42,7 +43,7 @@ async function onUser(user) {
   $("#userBtn").textContent = "Logg ut";
   $("#userBtn").title = user.email;
   await resolveRole();
-  store.subscribe("matches", (list) => { state.matches = list; renderMatches(); renderStats(); }, onDbError);
+  store.subscribe("matches", (list) => { state.matches = list; renderMatches(); renderStats(); migrateUnplanned(); }, onDbError);
   store.subscribe("players", (list) => {
     state.players = list;
     renderPlayers();
@@ -53,6 +54,26 @@ async function onUser(user) {
     }
   }, onDbError);
   showView("matches");
+}
+
+// Kamper fra 2027 som ble importert som «Avtalt» og ikke er rørt siden, settes til «Ikke planlagt».
+// Kjøres én gang per kamp: etterpå har kampen to logglinjer og blir ikke truffet igjen.
+let migrating = false;
+async function migrateUnplanned() {
+  if (!canSquad() || migrating) return;
+  const todo = state.matches.filter((m) => m.date >= FIRST_UNPLANNED && m.status === "avtalt" &&
+    (m.log || []).length === 1 && m.log[0].text.startsWith("Importert"));
+  if (!todo.length) return;
+  migrating = true;
+  try {
+    for (const m of todo) {
+      await store.update("matches", m.id, {
+        status: "ikkeplanlagt",
+        log: [...m.log, logEntry("Status → Ikke planlagt (2027-kamp)")],
+        updatedAt: new Date().toISOString()
+      });
+    }
+  } finally { migrating = false; }
 }
 
 // Rollen avgjøres av listene i config/access. Reglene i firestore.rules håndhever det samme på serveren.
@@ -155,7 +176,7 @@ function dayLabel(d) {
 function matchCard(m) {
   const s = statusOf(m.status);
   const idx = STATUSES.indexOf(s);
-  const next = idx < 4 ? STATUSES[idx + 1] : null; // ikke foreslå «Avlyst» som neste steg
+  const next = idx < SPILT ? STATUSES[idx + 1] : null; // ikke foreslå «Avlyst» som neste steg
   const squad = (m.squad || []).length;
   return `<article class="match" data-id="${m.id}" style="--c:${s.color}">
     <div class="when">
@@ -176,7 +197,7 @@ function matchCard(m) {
 async function advance(id) {
   const m = state.matches.find((x) => x.id === id);
   const idx = STATUSES.findIndex((s) => s.id === m.status);
-  const next = STATUSES[Math.min(idx + 1, 4)];
+  const next = STATUSES[Math.min(idx + 1, SPILT)];
   await store.update("matches", id, {
     status: next.id,
     log: [...(m.log || []), logEntry(`Status → ${next.label}`)],
@@ -300,9 +321,9 @@ function requestText() {
 const contactEmail = () => (form.contact.value.match(/[^\s,;<>]+@[^\s,;<>]+\.[a-z]{2,}/i) || [""])[0];
 const contactPhone = () => ((form.contact.value.match(/\+?\d[\d ]{6,}\d/) || [""])[0]).replace(/ /g, "");
 
-// Sett status til «Forespørsel sendt» når kampen fortsatt bare er planlagt internt
+// Sett status til «Forespørsel sendt» når kampen ikke er forespurt ennå
 async function markRequested(how) {
-  if (form.status.value !== "planlagt") return;
+  if (!["ikkeplanlagt", "planlagt"].includes(form.status.value)) return;
   form.status.value = "forespurt";
   const m = state.editing && state.matches.find((x) => x.id === state.editing);
   if (!m) return; // ny kamp: statusen lagres når skjemaet lagres

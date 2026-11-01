@@ -18,6 +18,7 @@ export const TEAMS = ["Hvit", "Rød"];
 
 // Rekkefølgen her er prosessen en kamp går gjennom.
 export const STATUSES = [
+  { id: "ikkeplanlagt", label: "Ikke planlagt",     color: "#94a3b8" },
   { id: "planlagt",   label: "Planlagt internt",   color: "#64748b" },
   { id: "forespurt",  label: "Forespørsel sendt",  color: "#d97706" },
   { id: "avtalt",     label: "Avtalt",             color: "#2563eb" },

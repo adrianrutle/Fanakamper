@@ -31,6 +31,9 @@ function teamOf(name) {
   return n.slice(CLUB.length).trim(); // «Hvit» / «Rød»
 }
 
+// Kamper fra og med denne datoen er ikke avtalt ennå og importeres som «Ikke planlagt»
+export const FIRST_UNPLANNED = "2027-01-01";
+
 export async function parseWorkbook(buf) {
   const XLSX = await loadXlsx();
   const wb = XLSX.read(buf, { type: "array" });
@@ -87,7 +90,7 @@ export async function parseWorkbook(buf) {
       venue: clean(r[9]),
       contact: contacts[opponent.toLowerCase()] || "",
       notes: clean(r[8]),
-      status: "avtalt",
+      status: date >= FIRST_UNPLANNED ? "ikkeplanlagt" : "avtalt",
       squad: []
     });
   }
