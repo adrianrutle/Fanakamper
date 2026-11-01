@@ -140,6 +140,12 @@
         <label>Hjemme/borte<select name="homeAway"><option>Hjemme</option><option>Borte</option></select></label>
         <label>Bane<input name="venue" list="venueList"></label>
         <label class="wide">Kontakt motstander<input name="contact" placeholder="Navn, telefon, e-post"></label>
+        <div class="wide request-row">
+          <span class="muted">Forespørsel:</span>
+          <button type="button" id="requestMail">✉️ E-post</button>
+          <button type="button" id="requestSms">💬 SMS</button>
+          <button type="button" id="requestCopy">📋 Kopier tekst</button>
+        </div>
         <label class="wide">Notater<textarea name="notes" rows="3"></textarea></label>
       </div>
       <fieldset>

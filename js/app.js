@@ -268,6 +268,68 @@ form.onsubmit = async (e) => {
   dlg.close();
 };
 
+// ---------- Forespørsel til motstander ----------
+// Åpner brukerens egen e-post-/SMS-app med ferdig tekst; appen sender ingenting selv.
+function requestText() {
+  const f = form;
+  const own = `Fana G2014 ${f.team.value}`;
+  const when = f.date.value
+    ? new Date(f.date.value + "T12:00").toLocaleDateString("no-NO", { weekday: "long", day: "numeric", month: "long" }) +
+      (f.time.value ? ` kl. ${f.time.value}` : "")
+    : "et tidspunkt som passer dere";
+  const where = f.venue.value ? `${f.venue.value} (${f.homeAway.value === "Borte" ? "hos dere" : "hjemme hos oss"})`
+    : f.homeAway.value === "Borte" ? "hos dere" : "hjemme hos oss";
+  const subject = `${f.type.value || "Kamp"}: ${own} – ${f.opponent.value || "?"}`;
+  const body = [
+    "Hei!",
+    "",
+    `${own} ønsker å spille ${(f.type.value || "kamp").toLowerCase()} mot ${f.opponent.value || "dere"}.`,
+    "",
+    `Forslag: ${when}`,
+    `Sted: ${where}`,
+    "",
+    "Passer dette? Gi gjerne beskjed om et annet tidspunkt passer bedre.",
+    "",
+    "Hilsen",
+    state.user?.name || "",
+    own
+  ].join("\n");
+  return { subject, body };
+}
+
+const contactEmail = () => (form.contact.value.match(/[^\s,;<>]+@[^\s,;<>]+\.[a-z]{2,}/i) || [""])[0];
+const contactPhone = () => ((form.contact.value.match(/\+?\d[\d ]{6,}\d/) || [""])[0]).replace(/ /g, "");
+
+// Sett status til «Forespørsel sendt» når kampen fortsatt bare er planlagt internt
+async function markRequested(how) {
+  if (form.status.value !== "planlagt") return;
+  form.status.value = "forespurt";
+  const m = state.editing && state.matches.find((x) => x.id === state.editing);
+  if (!m) return; // ny kamp: statusen lagres når skjemaet lagres
+  await store.update("matches", m.id, {
+    status: "forespurt",
+    log: [...(m.log || []), logEntry(`Forespørsel sendt (${how})`)],
+    updatedAt: new Date().toISOString()
+  });
+}
+
+$("#requestMail").onclick = () => {
+  const { subject, body } = requestText();
+  location.href = `mailto:${encodeURIComponent(contactEmail())}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  markRequested("e-post");
+};
+$("#requestSms").onclick = () => {
+  // «?&body=» fungerer både på iPhone og Android
+  location.href = `sms:${contactPhone()}?&body=${encodeURIComponent(requestText().body)}`;
+  markRequested("SMS");
+};
+$("#requestCopy").onclick = async () => {
+  await navigator.clipboard.writeText(requestText().body);
+  $("#requestCopy").textContent = "✅ Kopiert";
+  setTimeout(() => ($("#requestCopy").textContent = "📋 Kopier tekst"), 2000);
+  markRequested("kopiert tekst");
+};
+
 $("#deleteMatch").onclick = async () => {
   if (!confirm("Slette denne kampen?")) return;
   await store.remove("matches", state.editing);

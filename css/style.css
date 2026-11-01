@@ -90,6 +90,7 @@ fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 12px 0; }
 .result-input { display: flex; align-items: flex-end; gap: 10px; }
 .result-input label { flex: 1; display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--muted); }
 .result-input > span { padding-bottom: 8px; font-weight: 700; }
+.request-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
 .score { display: inline-block; min-width: 1.6em; text-align: center; font-size: 12px; font-weight: 700;
   padding: 1px 6px; border-radius: 4px; margin-left: 6px; color: #fff; background: #64748b; }
 .score-S { background: #16a34a; }
