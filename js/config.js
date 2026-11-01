@@ -2,12 +2,12 @@
 // (Prosjektinnstillinger → Dine apper → Web-app → SDK-oppsett).
 // Så lenge apiKey er tom kjører appen i DEMO-modus med lagring kun i nettleseren.
 export const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyCuOwz4tEK1u-zA6NRNfY5J6abXcTgOUpI",
+  authDomain: "fanakamper.firebaseapp.com",
+  projectId: "fanakamper",
+  storageBucket: "fanakamper.firebasestorage.app",
+  messagingSenderId: "986001360192",
+  appId: "1:986001360192:web:0a8a9829eec414025ae6a5"
 };
 
 // Eieren har alltid tilgang og kan gi andre tilgang under «Innstillinger».
