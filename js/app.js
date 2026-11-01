@@ -7,7 +7,8 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const statusOf = (id) => STATUSES.find((s) => s.id === id) || STATUSES[0];
+// Ukjent status (f.eks. gammel lagret kode i nettleseren) vises som den er, ikke som første status i lista
+const statusOf = (id) => STATUSES.find((s) => s.id === id) || { id, label: id || "Uten status", color: "#94a3b8" };
 const today = () => new Date().toISOString().slice(0, 10);
 const hasResult = (m) => m.goalsFor !== "" && m.goalsFor != null && m.goalsAgainst !== "" && m.goalsAgainst != null;
 // «S», «U» eller «T» sett fra Fana
@@ -233,7 +234,7 @@ $("#cancelMatch").onclick = () => dlg.close();
 
 function openMatch(id) {
   const m = id ? state.matches.find((x) => x.id === id) : {
-    team: state.team || TEAMS[0], status: "planlagt", homeAway: "Hjemme", type: "Treningskamp", squad: []
+    team: state.team || TEAMS[0], status: STATUSES[0].id, homeAway: "Hjemme", type: "Treningskamp", squad: []
   };
   state.editing = id;
   $("#matchTitle").textContent = id ? "Rediger kamp" : "Ny kamp";
@@ -241,7 +242,7 @@ function openMatch(id) {
     if (el.name && el.name in form.elements) el.value = m[el.name] ?? "";
   }
   form.team.value = m.team || TEAMS[0];
-  form.status.value = m.status || "planlagt";
+  form.status.value = m.status || STATUSES[0].id;
   $("#deleteMatch").hidden = !id;
   $("#resultOpponent").textContent = m.opponent || "Motstander";
   renderSquadPicker(m.team, m.squad || []);
