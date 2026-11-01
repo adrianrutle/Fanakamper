@@ -14,7 +14,7 @@ export const firebaseConfig = {
 // Må være lik e-posten i firestore.rules.
 export const OWNER_EMAIL = "adrian.rutle@gmail.com";
 
-export const TEAMS = ["Hvit", "Rød"];
+export const TEAMS = ["Hvit", "Rød", "Blå"];
 
 // Rekkefølgen her er prosessen en kamp går gjennom.
 export const STATUSES = [

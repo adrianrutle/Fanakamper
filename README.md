@@ -1,6 +1,6 @@
 # Fana G2014 – Kampoversikt
 
-Enkel webapp (mobil + nettleser) for å organisere kamper for Fana G2014 Hvit og Rød.
+Enkel webapp (mobil + nettleser) for å organisere kamper for Fana G2014 Hvit, Rød og Blå.
 
 - **Hosting:** GitHub Pages (gratis, statiske filer – ingen server å drifte)
 - **Database + innlogging:** Firebase (Firestore + Google-innlogging), gratisnivået holder godt
@@ -56,7 +56,7 @@ om noen prøver å gå rundt appen. Husk å publisere reglene på nytt i Firebas
 
 Spond har ingen åpen API for å opprette kamper, men sesongplanleggeren på web kan importere filer:
 **Innstillinger → Eksport til Spond** lager enten et regneark med samme kolonner som Spond-malen
-(`Startdato*`, `Starttidspunkt`, `Oppmøte`, … `Sted`) eller en kalenderfil (.ics). Velg lag hvis Hvit og Rød er egne Spond-grupper.
+(`Startdato*`, `Starttidspunkt`, `Oppmøte`, … `Sted`) eller en kalenderfil (.ics). Velg lag hvis lagene er egne Spond-grupper.
 I Spond: gruppen → Opprett arrangement → Sesongplanlegger → Importer. Troppene må fortsatt settes i Spond (invitasjoner).
 
 ## Import fra Excel
@@ -64,7 +64,7 @@ I Spond: gruppen → Opprett arrangement → Sesongplanlegger → Importer. Trop
 Importen leser arket direkte i nettleseren og skriver til Firebase – filen lastes ikke opp noe annet sted.
 Kamper og spillere som allerede finnes blir ikke overskrevet, så importen kan trygt kjøres på nytt – men endringer i eksisterende
 kamper (f.eks. nye tropper) må da gjøres i appen.
-Spillere på nivå 1 blir «Hvit», nivå 2 «Rød», resten «Begge». Logikken ligger i [js/excel-import.js](js/excel-import.js).
+Spillere på nivå 1 blir «Hvit», nivå 2 «Rød», resten «Blå». Logikken ligger i [js/excel-import.js](js/excel-import.js).
 
 **Personvern:** Repoet og GitHub Pages er offentlige. Legg aldri Excel-arket, spillerlister eller kontaktinfo i repoet –
 `.gitignore` stopper `.xlsx`/`.csv`-filer. Alt slikt hører hjemme i databasen, som bare innloggede med tilgang kan lese.

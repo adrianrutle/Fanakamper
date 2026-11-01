@@ -5,7 +5,7 @@
 const XLSX_URL = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
 
 // Nivå i arket → lag i appen
-const LEVEL_TEAM = { 1: "Hvit", 2: "Rød" };
+const LEVEL_TEAM = { 1: "Hvit", 2: "Rød", 3: "Blå" };
 const CLUB = "Fana G2014";
 
 export function loadXlsx() {
@@ -28,7 +28,7 @@ export const matchId = (team, date) => `${slug(team)}-${date}`;
 function teamOf(name) {
   const n = clean(name);
   if (!n.startsWith(CLUB)) return null;
-  return n.slice(CLUB.length).trim(); // «Hvit» / «Rød»
+  return n.slice(CLUB.length).trim(); // «Hvit» / «Rød» / «Blå»
 }
 
 // Kamper fra og med denne datoen er ikke avtalt ennå og importeres som «Ikke planlagt»
@@ -109,7 +109,7 @@ export async function parseWorkbook(buf) {
       for (const r of lt.slice(listStart + 1)) {
         const name = clean(r[0]);
         if (!name) continue;
-        players.set(playerId(name), { id: playerId(name), name, team: LEVEL_TEAM[r[1]] || "Begge" });
+        players.set(playerId(name), { id: playerId(name), name, team: LEVEL_TEAM[r[1]] || "Blå" });
       }
     }
     for (const r of lt) {

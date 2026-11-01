@@ -19,11 +19,13 @@ const outcome = (m) => {
 const state = { user: null, matches: [], players: [], team: "", status: "", showPast: false, matrixTeam: "", editing: null, role: null, access: null };
 const canSquad = () => state.role === "owner" || state.role === "eval";
 const SPILT = STATUSES.findIndex((s) => s.id === "spilt");
+const teamRank = (t) => (TEAMS.includes(t) ? TEAMS.indexOf(t) : TEAMS.length);
+const byTeamAndName = (a, b) => (teamRank(a.team) - teamRank(b.team)) || a.name.localeCompare(b.name, "no");
 const ROLE_LABEL = { owner: "Eier (full tilgang)", eval: "Evalueringsgruppen – kan sette opp tropper", reader: "Lesetilgang til tropper" };
 
 // ---------- Oppstart ----------
 fillSelect($("#statusFilter"), STATUSES.map((s) => [s.id, s.label]), true);
-fillSelect($("#playerTeam"), [...TEAMS, "Begge"].map((t) => [t, t]));
+fillSelect($("#playerTeam"), TEAMS.map((t) => [t, t]));
 fillSelect($("#matchForm").team, TEAMS.map((t) => [t, t]));
 fillSelect($("#matchForm").status, STATUSES.map((s) => [s.id, s.label]));
 if (store.demoMode) $("#demoBanner").hidden = false;
@@ -46,6 +48,7 @@ async function onUser(user) {
   store.subscribe("matches", (list) => { state.matches = list; renderMatches(); renderStats(); migrateUnplanned(); }, onDbError);
   store.subscribe("players", (list) => {
     state.players = list;
+    migrateBegge();
     renderPlayers();
     renderStats();
     if (dlg.open && !$$("#squadPicker input").length) {
@@ -74,6 +77,18 @@ async function migrateUnplanned() {
       });
     }
   } finally { migrating = false; }
+}
+
+// Spillere som sto på «Begge» før Blå fantes, hører nå til Blå.
+let movingBegge = false;
+async function migrateBegge() {
+  if (!canSquad() || movingBegge) return;
+  const todo = state.players.filter((p) => p.team === "Begge");
+  if (!todo.length) return;
+  movingBegge = true;
+  try {
+    for (const p of todo) await store.update("players", p.id, { team: "Blå" });
+  } finally { movingBegge = false; }
 }
 
 // Rollen avgjøres av listene i config/access. Reglene i firestore.rules håndhever det samme på serveren.
@@ -248,15 +263,20 @@ function selectedSquad() {
 
 function renderSquadPicker(team, chosen) {
   const set = new Set(chosen);
-  const own = (p) => p.team === team || p.team === "Begge";
-  const players = state.players.slice().sort((a, b) =>
-    (own(b) - own(a)) || a.name.localeCompare(b.name, "no"));
-  if (!players.length) {
+  // Alle spillere kan velges; spillere på kampens lag vises først som anbefalt
+  const own = state.players.filter((p) => p.team === team).sort(byTeamAndName);
+  const rest = state.players.filter((p) => p.team !== team).sort(byTeamAndName);
+  const box = (p) => `
+      <label title="${esc(p.team || "Uten lag")}"><input type="checkbox" value="${p.id}" ${set.has(p.id) ? "checked" : ""} ${canSquad() ? "" : "disabled"}>
+        <span class="dot team-${esc(p.team)}"></span>${esc(p.name)}</label>`;
+  if (!state.players.length) {
     $("#squadPicker").innerHTML = `<p class="muted">Legg til spillere under «Spillere» først.</p>`;
   } else {
-    $("#squadPicker").innerHTML = players.map((p) => `
-      <label class="${own(p) ? "" : "other"}"><input type="checkbox" value="${p.id}" ${set.has(p.id) ? "checked" : ""} ${canSquad() ? "" : "disabled"}>
-        ${esc(p.name)}${own(p) ? "" : ` <small>(${esc(p.team)})</small>`}</label>`).join("");
+    $("#squadPicker").innerHTML =
+      (own.length ? `<div class="squad-group"><span class="team team-${esc(team)}">${esc(team)}</span> anbefalt for denne kampen</div>
+        <div class="squad">${own.map(box).join("")}</div>` : "") +
+      (rest.length ? `<div class="squad-group rest">Andre spillere</div>
+        <div class="squad">${rest.map(box).join("")}</div>` : "");
   }
   $("#squadLocked").hidden = canSquad();
   const count = () => ($("#squadCount").textContent = `(${selectedSquad().length} valgt)`);
@@ -390,9 +410,7 @@ function renderStats() {
       : `<p class="muted">Ingen resultater registrert ennå. Åpne en kamp og fyll inn resultatet.</p>`}`;
 
   // Spillere: antall kamper per nivå
-  const levelOrder = { Hvit: 0, Rød: 1, Begge: 2 };
-  const players = state.players.slice().sort((a, b) =>
-    (levelOrder[a.team] - levelOrder[b.team]) || a.name.localeCompare(b.name, "no"));
+  const players = state.players.slice().sort(byTeamAndName);
   const count = (p, pred) => active.filter((m) => (m.squad || []).includes(p.id) && pred(m)).length;
   $("#playerStats").innerHTML = `<tr><th>Spiller</th><th>Nivå</th>
       ${TEAMS.map((t) => `<th><span class="team team-${t}">${t}</span></th>`).join("")}
@@ -430,13 +448,13 @@ $("#playerForm").onsubmit = async (e) => {
 };
 
 function renderPlayers() {
-  const groups = [...TEAMS, "Begge"].map((t) => {
+  const groups = TEAMS.map((t) => {
     const ps = state.players.filter((p) => p.team === t).sort((a, b) => a.name.localeCompare(b.name, "no"));
     if (!ps.length) return "";
     return `<div class="card"><h3>${esc(t)} <span class="muted">(${ps.length})</span></h3>
       <ul class="players">${ps.map((p) => `<li>
         <span>${esc(p.name)}</span>
-        <select data-id="${p.id}" ${canSquad() ? "" : "disabled"}>${[...TEAMS, "Begge"].map((x) =>
+        <select data-id="${p.id}" ${canSquad() ? "" : "disabled"}>${TEAMS.map((x) =>
           `<option ${x === p.team ? "selected" : ""}>${x}</option>`).join("")}</select>
         <button class="ghost del eval-only" data-id="${p.id}" title="Fjern">✕</button></li>`).join("")}</ul></div>`;
   }).join("");

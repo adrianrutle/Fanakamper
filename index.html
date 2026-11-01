@@ -29,7 +29,7 @@
   <main>
     <section id="login" class="view center" hidden>
       <h1>Kampoversikt</h1>
-      <p>Fana G2014 Hvit og Rød</p>
+      <p>Fana G2014 Hvit, Rød og Blå</p>
       <button id="loginBtn" class="primary big">Logg inn med Google</button>
       <p id="loginError" class="error"></p>
     </section>
@@ -40,6 +40,7 @@
           <button data-team="" class="active">Alle</button>
           <button data-team="Hvit">Hvit</button>
           <button data-team="Rød">Rød</button>
+          <button data-team="Blå">Blå</button>
         </div>
         <select id="statusFilter"><option value="">Alle statuser</option></select>
         <label class="check"><input type="checkbox" id="showPast"> Vis tidligere</label>
@@ -61,6 +62,7 @@
           <button data-team="" class="active">Alle</button>
           <button data-team="Hvit">Hvit</button>
           <button data-team="Rød">Rød</button>
+          <button data-team="Blå">Blå</button>
         </div>
       </div>
       <div class="table-wrap"><table id="matrix" class="stats matrix"></table></div>
@@ -105,10 +107,10 @@
       <div class="card">
         <h3>Eksport til Spond</h3>
         <p class="muted">Spond (web) → gruppen → Opprett arrangement → Sesongplanlegger → Importer.
-          Bruk regnearket, eller kalenderfilen hvis regnearket ikke godtas. Lag én fil per lag hvis Hvit og Rød er egne Spond-grupper.
+          Bruk regnearket, eller kalenderfilen hvis regnearket ikke godtas. Lag én fil per lag hvis lagene er egne Spond-grupper.
           Avlyste kamper er ikke med.</p>
         <div class="toolbar">
-          <select id="spondTeam"><option value="">Begge lag</option><option>Hvit</option><option>Rød</option></select>
+          <select id="spondTeam"><option value="">Alle lag</option><option>Hvit</option><option>Rød</option><option>Blå</option></select>
           <label class="check"><input type="checkbox" id="spondPast"> Ta med tidligere kamper</label>
         </div>
         <div class="toolbar">
@@ -159,7 +161,7 @@
       <fieldset>
         <legend>Kamptropp <span id="squadCount" class="muted"></span></legend>
         <p id="squadLocked" class="muted" hidden>🔒 Bare evalueringsgruppen kan endre troppen.</p>
-        <div id="squadPicker" class="squad"></div>
+        <div id="squadPicker"></div>
       </fieldset>
       <details id="logBox"><summary>Historikk</summary><ul id="logList"></ul></details>
       <div class="actions">

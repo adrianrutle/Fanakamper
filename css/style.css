@@ -56,6 +56,7 @@ input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(
 .team { font-size: 11px; padding: 1px 6px; border-radius: 4px; margin-right: 4px; vertical-align: middle; border: 1px solid var(--line); }
 .team-Rød { background: #dc2626; color: #fff; border-color: #dc2626; }
 .team-Hvit { background: #fff; color: #111; }
+.team-Blå { background: #2563eb; color: #fff; border-color: #2563eb; }
 
 .card { background: var(--card); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
 .card textarea { margin: 6px 0; }
@@ -74,7 +75,9 @@ dialog::backdrop { background: rgba(0,0,0,.4); }
 fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 12px 0; }
 .squad { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px; }
 .squad label { display: flex; gap: 6px; align-items: center; padding: 4px; }
-.squad label.other { opacity: .65; }
+.squad-group { margin: 8px 0 4px; font-size: 13px; font-weight: 600; }
+.squad-group.rest { color: var(--muted); font-weight: 500; }
+.squad .dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #94a3b8; flex: none; padding: 0; }
 .squad input { width: auto; }
 #logList { font-size: 13px; padding-left: 18px; }
 .actions { display: flex; gap: 8px; margin-top: 12px; position: sticky; bottom: 0; background: var(--card); padding-top: 8px; }
@@ -110,9 +113,11 @@ table.stats { border-collapse: collapse; width: 100%; font-size: 13px; }
 .matrix td { padding: 4px; min-width: 32px; }
 .team-col-Hvit { background: rgba(148, 163, 184, .18); }
 .team-col-Rød { background: rgba(220, 38, 38, .14); }
+.team-col-Blå { background: rgba(37, 99, 235, .14); }
 .matrix td.on { font-size: 14px; }
 .matrix td.on.team-col-Hvit { color: var(--text); background: rgba(148, 163, 184, .45); }
 .matrix td.on.team-col-Rød { color: #dc2626; background: rgba(220, 38, 38, .25); }
+.matrix td.on.team-col-Blå { color: #2563eb; background: rgba(37, 99, 235, .25); }
 
 @media (max-width: 480px) {
   .topbar { gap: 4px 12px; }
