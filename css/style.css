@@ -187,3 +187,13 @@ body[data-role="reader"] .slot, body[data-role="reader"] .chip { cursor: default
 .ghost-drag { position: fixed !important; z-index: 1000; pointer-events: none; transform: translate(-50%, -50%) scale(1.1); }
 .chip.ghost-drag { background: var(--card); box-shadow: 0 4px 12px rgba(0,0,0,.3); }
 .slot.ghost-drag { color: #fff; }
+/* Kampmatrise: antall kamper i navnekolonnen, antall i troppen i kolonnehodet */
+.matrix tr > th:first-child { box-shadow: 1px 0 0 var(--line); vertical-align: middle; }
+.matrix .pcell { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.matrix .nbadge { min-width: 24px; padding: 1px 6px; border-radius: 10px; background: #0b3d91; color: #fff; font-weight: 700; font-size: 12px; text-align: center; }
+.matrix .nbadge.empty { background: var(--line); color: var(--muted); }
+.matrix .nbadge.head { background: none; color: var(--muted); font-weight: 600; font-size: 11px; padding: 0; }
+.matrix th.col { vertical-align: top; }
+.matrix th.col .venue { display: block; max-width: 56px; margin: 2px auto 0; overflow: hidden; text-overflow: ellipsis; font-weight: 400; color: var(--muted); }
+.matrix th.col .cnt { display: inline-block; margin-top: 3px; min-width: 22px; padding: 1px 5px; border-radius: 10px; background: #0b3d91; color: #fff; font-size: 11px; font-weight: 700; }
+.matrix th.col .cnt.empty { background: var(--line); color: var(--muted); }

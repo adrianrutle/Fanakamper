@@ -699,16 +699,19 @@ function renderStats() {
   // Matrise: spillere × kamper (innbyttere vises svakere når kampen har oppstilling)
   const isSub = (m, id) => (m.lineup || []).some(Boolean) && !m.lineup.includes(id);
   const cols = active.filter((m) => !state.matrixTeam || m.team === state.matrixTeam);
-  $("#matrix").innerHTML = `<tr><th>Spiller</th>${cols.map((m) =>
-      `<th class="col team-col-${esc(m.team)}" title="${esc(m.team)} – ${esc(m.opponent)}${m.squad?.length ? ` (${m.squad.length} i troppen)` : ""}">
-        ${m.date ? m.date.slice(8, 10) + "." + m.date.slice(5, 7) : "?"}<br><small>${esc(m.team[0])}</small></th>`).join("")}
-      <th>Σ</th></tr>` +
+  // Antall kamper står i den faste navnekolonnen, så det alltid er synlig når tabellen rulles sidelengs.
+  // Hver kampkolonne viser dato, lag, bane og antall i troppen.
+  $("#matrix").innerHTML = `<tr><th><div class="pcell">Spiller <span class="nbadge head" title="Antall kamper">Kamper</span></div></th>${cols.map((m) =>
+      `<th class="col team-col-${esc(m.team)}" title="${esc(m.team)} ${m.homeAway === "Borte" ? "@" : "vs"} ${esc(m.opponent)}${m.venue ? " · " + esc(m.venue) : ""} · ${(m.squad || []).length} i troppen">
+        ${m.date ? m.date.slice(8, 10) + "." + m.date.slice(5, 7) : "?"}<br><small>${esc(m.team[0])}</small>
+        <span class="venue">${esc(m.venue || "–")}</span>
+        <span class="cnt${(m.squad || []).length ? "" : " empty"}">${(m.squad || []).length}</span></th>`).join("")}</tr>` +
     players.map((p) => {
       const cells = cols.map((m) => (m.squad || []).includes(p.id));
       const n = cells.filter(Boolean).length;
       if (!n && state.matrixTeam && p.team !== state.matrixTeam) return "";
-      return `<tr class="${n ? "" : "zero"}"><th>${esc(p.name)}</th>${cells.map((on, i) =>
-        `<td data-m="${cols[i].id}" data-p="${p.id}" class="${on ? "on team-col-" + esc(cols[i].team) : ""}${on && isSub(cols[i], p.id) ? " sub" : ""}">${on ? esc(cols[i].positions?.[p.id] || "●") : ""}</td>`).join("")}<td><b>${n}</b></td></tr>`;
+      return `<tr class="${n ? "" : "zero"}"><th><div class="pcell"><span class="pn">${esc(p.name)}</span><span class="nbadge${n ? "" : " empty"}">${n}</span></div></th>${cells.map((on, i) =>
+        `<td data-m="${cols[i].id}" data-p="${p.id}" class="${on ? "on team-col-" + esc(cols[i].team) : ""}${on && isSub(cols[i], p.id) ? " sub" : ""}">${on ? esc(cols[i].positions?.[p.id] || "●") : ""}</td>`).join("")}</tr>`;
     }).join("");
   $("#matrix").classList.toggle("editable", canSquad());
   if (canSquad()) $$("#matrix td[data-m]").forEach((td) => (td.onclick = () => toggleInSquad(td.dataset.m, td.dataset.p)));
