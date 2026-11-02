@@ -1,5 +1,6 @@
 import * as store from "./store.js";
-import { TEAMS, STATUSES, OWNER_EMAIL, POSITIONS, MATCH_POSITIONS } from "./config.js";
+import { TEAMS, STATUSES, OWNER_EMAIL, POSITIONS, MATCH_POSITIONS, FORMATIONS, DEFAULT_FORMATION } from "./config.js";
+import { slots, targets, countGroups, balanceIssues, autoAssign, autoLineup } from "./lineup.js";
 import { parseWorkbook, loadXlsx, FIRST_UNPLANNED } from "./excel-import.js";
 import { spondRows, toIcs } from "./spond.js";
 
@@ -35,6 +36,7 @@ fillSelect($("#statusFilter"), STATUSES.map((s) => [s.id, s.label]), true);
 fillSelect($("#playerTeam"), TEAMS.map((t) => [t, t]));
 fillSelect($("#matchForm").team, TEAMS.map((t) => [t, t]));
 fillSelect($("#matchForm").status, STATUSES.map((s) => [s.id, s.label]));
+fillSelect($("#formation"), FORMATIONS.map((f) => [f, f]));
 if (store.demoMode) $("#demoBanner").hidden = false;
 
 
@@ -200,6 +202,7 @@ function matchCard(m) {
   const idx = STATUSES.indexOf(s);
   const next = idx < SPILT ? STATUSES[idx + 1] : null; // ikke foreslå «Avlyst» som neste steg
   const squad = (m.squad || []).length;
+  const warn = squad && balanceIssues(m.formation || DEFAULT_FORMATION, m.squad, m.positions).length;
   return `<article class="match" data-id="${m.id}" style="--c:${s.color}">
     <div class="when">
       <b>${m.date ? dayLabel(m.date) : "Dato?"}</b>
@@ -209,7 +212,7 @@ function matchCard(m) {
       <div class="title"><span class="team team-${esc(m.team)}">${esc(m.team)}</span>
         ${m.homeAway === "Borte" ? "@ " : "vs "}${esc(m.opponent || "?")}
         ${hasResult(m) ? `<span class="score score-${outcome(m)}">${esc(m.goalsFor)}–${esc(m.goalsAgainst)}</span>` : ""}</div>
-      <div class="meta">${esc(m.venue || "Bane ikke satt")} · ${esc(m.type || "")} · Tropp: ${squad}</div>
+      <div class="meta">${esc(m.venue || "Bane ikke satt")} · ${esc(m.type || "")} · Tropp: ${squad}${warn ? ` <span class="warn" title="Skjev fordeling av posisjoner">⚠</span>` : ""}</div>
       <span class="status">${esc(s.label)}</span>
     </div>
     ${next ? `<button class="next" data-id="${m.id}" title="Sett til «${esc(next.label)}»">→ ${esc(next.label)}</button>` : ""}
@@ -251,6 +254,9 @@ function openMatch(id) {
   form.status.value = m.status || STATUSES[0].id;
   $("#deleteMatch").hidden = !id;
   $("#resultOpponent").textContent = m.opponent || "Motstander";
+  $("#formation").value = FORMATIONS.includes(m.formation) ? m.formation : DEFAULT_FORMATION;
+  board.lineup = [...(m.lineup || [])];
+  board.picked = null;
   renderSquadPicker(m.team, m.squad || [], m.positions || {});
   const log = m.log || [];
   $("#logBox").hidden = !log.length;
@@ -305,11 +311,7 @@ function renderSquadPicker(team, chosen, positions = {}) {
         <div class="squad">${rest.map(box).join("")}</div>` : "");
   }
   $("#squadLocked").hidden = canSquad();
-  const count = () => {
-    const pos = Object.values(selectedPositions());
-    const per = MATCH_POSITIONS.map((x) => [x.id, pos.filter((v) => v === x.id).length]).filter(([, n]) => n);
-    $("#squadCount").textContent = `(${selectedSquad().length} valgt${per.length ? ": " + per.map(([k, n]) => `${k} ${n}`).join(" · ") : ""})`;
-  };
+  const count = () => { renderBalance(); renderBoard(); };
   $$("#squadPicker input").forEach((i) => (i.onchange = () => {
     const pick = i.closest(".pick");
     pick.classList.toggle("on", i.checked);
@@ -328,9 +330,15 @@ form.onsubmit = async (e) => {
   for (const el of form.elements) if (el.name) data[el.name] = el.value.trim();
   const old = state.editing ? state.matches.find((x) => x.id === state.editing) : null;
   // Var spillerlisten ikke lastet da kampen ble åpnet, finnes ingen avkrysningsbokser – behold da troppen
-  const picker = canSquad() && $$("#squadPicker input").length;
-  data.squad = picker ? selectedSquad() : (old?.squad || []);
-  data.positions = picker ? selectedPositions() : (old?.positions || {});
+  if (canSquad() && $$("#squadPicker input").length) {
+    data.squad = selectedSquad();
+    data.positions = selectedPositions();
+    data.formation = $("#formation").value;
+    data.lineup = currentLineup();
+  } else if (!old) {
+    data.squad = [];
+  }
+  // Ellers sendes ikke tropp/posisjoner/oppstilling med, så de blir stående urørt i databasen
   data.updatedAt = new Date().toISOString();
   const log = [...(old?.log || [])];
   if (hasResult(data)) {
@@ -347,6 +355,129 @@ form.onsubmit = async (e) => {
   if (old) await store.update("matches", state.editing, data);
   else await store.add("matches", { ...data, createdBy: state.user.email, createdAt: data.updatedAt });
   dlg.close();
+};
+
+// ---------- Fordeling og laguppstilling ----------
+const board = { lineup: [], picked: null };
+const playerById = (id) => state.players.find((p) => p.id === id);
+const firstName = (id) => (playerById(id)?.name || "?").split(" ")[0];
+const posSelect = (id) => $(`#squadPicker select.mpos[data-id="${id}"]`);
+
+function renderBalance() {
+  const f = $("#formation").value;
+  const squad = selectedSquad();
+  const pos = selectedPositions();
+  const c = countGroups(squad, pos);
+  const t = targets(f, squad.length);
+  const issues = balanceIssues(f, squad, pos);
+  $("#squadCount").textContent = `(${squad.length} valgt)`;
+  $("#balance").innerHTML = squad.length ? `
+    <div class="bal-row">${MATCH_POSITIONS.map((x) => {
+      const off = x.id === "K" ? c.K !== 1 : Math.abs(c[x.id] - t[x.id]) >= 2;
+      return `<span class="bal g-${x.id}${off ? " off" : ""}" title="${x.label}: ${c[x.id]}, anbefalt ${t[x.id]}">
+        ${x.label} <b>${c[x.id]}</b><small>/${t[x.id]}</small></span>`;
+    }).join("")}
+    <button type="button" id="autoAssign" class="eval-only small">⚖️ Fordel posisjoner</button></div>
+    ${issues.length ? `<ul class="issues">${issues.map((i) => `<li>⚠ ${esc(i)}</li>`).join("")}</ul>`
+      : `<p class="ok">✓ God fordeling for ${esc(f)}</p>`}` : "";
+  const btn = $("#autoAssign");
+  if (btn) btn.onclick = () => {
+    if (Object.keys(pos).length && !confirm("Fordele posisjonene på nytt for hele troppen? Banen tømmes.")) return;
+    const res = autoAssign(squad.map(playerById).filter(Boolean), f);
+    for (const [id, g] of Object.entries(res)) { const s = posSelect(id); if (s) s.value = g; }
+    board.lineup = [];
+    board.picked = null;
+    renderBalance(); renderBoard();
+  };
+}
+
+// Oppstillingen begrenset til spillere som faktisk er i troppen
+function currentLineup() {
+  const squad = new Set(selectedSquad());
+  const seen = new Set();
+  return slots($("#formation").value).map((_, i) => {
+    const id = board.lineup[i];
+    if (!id || !squad.has(id) || seen.has(id)) return "";
+    seen.add(id);
+    return id;
+  });
+}
+
+// Spiller som settes inn på en plass, får plassens kampposisjon
+function syncLineupPositions() {
+  const sl = slots($("#formation").value);
+  board.lineup.forEach((id, i) => { if (id && sl[i]) { const s = posSelect(id); if (s) s.value = sl[i].g; } });
+}
+
+function renderBoard() {
+  const sl = slots($("#formation").value);
+  board.lineup = currentLineup();
+  const onPitch = new Set(board.lineup.filter(Boolean));
+  const pos = selectedPositions();
+  const bench = selectedSquad().filter((id) => !onPitch.has(id))
+    .sort((a, b) => "KFMA".indexOf(pos[a] || "Z") - "KFMA".indexOf(pos[b] || "Z") || firstName(a).localeCompare(firstName(b), "no"));
+  const pk = board.picked;
+  $("#pitch").innerHTML = `<div class="pitch-lines"><span class="box top"></span><span class="mid"></span><span class="circle"></span><span class="box bottom"></span></div>` +
+    sl.map((s, i) => {
+      const id = board.lineup[i];
+      return `<button type="button" class="slot g-${s.g}${id ? " filled" : ""}${id && id === pk ? " picked" : ""}" data-slot="${i}"
+        style="left:${s.x}%;top:${s.y}%" title="${esc(s.pos)}">
+        <span class="shirt">${id ? esc(firstName(id).slice(0, 2)) : esc(s.pos)}</span>
+        <span class="nm">${id ? esc(firstName(id)) : "&nbsp;"}</span></button>`;
+    }).join("");
+  $("#bench").innerHTML = `<div class="bench-head">Innbyttere (${bench.length})</div>` +
+    (bench.length ? bench.map((id) => `<button type="button" class="chip g-${pos[id] || "none"}${id === pk ? " picked" : ""}" data-id="${id}">
+      ${esc(playerById(id)?.name || id)} <small>${esc(pos[id] || "–")}</small></button>`).join("")
+      : `<span class="muted">${selectedSquad().length ? "Alle i troppen er på banen." : "Velg kamptropp først."}</span>`);
+  if (!canSquad()) return;
+  $$("#pitch .slot").forEach((b) => (b.onclick = () => clickSlot(+b.dataset.slot)));
+  $$("#bench .chip").forEach((b) => (b.onclick = (e) => {
+    e.stopPropagation();
+    board.picked = board.picked === b.dataset.id ? null : b.dataset.id;
+    renderBoard();
+  }));
+  $("#bench").onclick = () => {
+    // Spiller valgt på banen + trykk på benken = ta spilleren av
+    if (!board.picked || !onPitch.has(board.picked)) return;
+    board.lineup = board.lineup.map((x) => (x === board.picked ? "" : x));
+    board.picked = null;
+    renderBalance(); renderBoard();
+  };
+}
+
+function clickSlot(i) {
+  const occupant = board.lineup[i] || "";
+  const pk = board.picked;
+  if (!pk) {
+    if (occupant) { board.picked = occupant; renderBoard(); }
+    return;
+  }
+  if (pk === occupant) { board.picked = null; renderBoard(); return; }
+  const from = board.lineup.indexOf(pk);
+  board.lineup[i] = pk;
+  if (from >= 0) board.lineup[from] = occupant; // bytt plass på banen
+  board.picked = null;
+  syncLineupPositions();
+  renderBalance(); renderBoard();
+}
+
+$("#formation").onchange = () => { syncLineupPositions(); renderBalance(); renderBoard(); };
+$("#clearLineup").onclick = () => { board.lineup = []; board.picked = null; renderBoard(); };
+$("#autoLineup").onclick = () => {
+  const f = $("#formation").value;
+  const players = selectedSquad().map(playerById).filter(Boolean);
+  if (!players.length) return alert("Velg kamptropp først.");
+  // Spillere uten kampposisjon får en først, så fordelingen holder seg jevn
+  const pos = autoAssign(players, f, selectedPositions());
+  for (const [id, g] of Object.entries(pos)) { const s = posSelect(id); if (s && !s.value) s.value = g; }
+  // Telling av starter i andre kamper, for å fordele spilletid
+  const starts = {};
+  for (const m of state.matches) if (m.id !== state.editing && m.status !== "avlyst")
+    for (const id of m.lineup || []) if (id) starts[id] = (starts[id] || 0) + 1;
+  board.lineup = autoLineup(f, players, selectedPositions(), currentLineup(), starts);
+  board.picked = null;
+  syncLineupPositions();
+  renderBalance(); renderBoard();
 };
 
 // ---------- Forespørsel til motstander ----------
@@ -463,7 +594,8 @@ function renderStats() {
         <td><b>${total}</b></td><td>${count(p, (m) => m.status === "spilt") || ""}</td></tr>`;
     }).join("");
 
-  // Matrise: spillere × kamper
+  // Matrise: spillere × kamper (innbyttere vises svakere når kampen har oppstilling)
+  const isSub = (m, id) => (m.lineup || []).some(Boolean) && !m.lineup.includes(id);
   const cols = active.filter((m) => !state.matrixTeam || m.team === state.matrixTeam);
   $("#matrix").innerHTML = `<tr><th>Spiller</th>${cols.map((m) =>
       `<th class="col team-col-${esc(m.team)}" title="${esc(m.team)} – ${esc(m.opponent)}">
@@ -474,7 +606,7 @@ function renderStats() {
       const n = cells.filter(Boolean).length;
       if (!n && state.matrixTeam && p.team !== state.matrixTeam) return "";
       return `<tr class="${n ? "" : "zero"}"><th>${esc(p.name)}</th>${cells.map((on, i) =>
-        `<td class="${on ? "on team-col-" + esc(cols[i].team) : ""}">${on ? esc(cols[i].positions?.[p.id] || "●") : ""}</td>`).join("")}<td><b>${n}</b></td></tr>`;
+        `<td class="${on ? "on team-col-" + esc(cols[i].team) : ""}${on && isSub(cols[i], p.id) ? " sub" : ""}">${on ? esc(cols[i].positions?.[p.id] || "●") : ""}</td>`).join("")}<td><b>${n}</b></td></tr>`;
     }).join("");
 }
 

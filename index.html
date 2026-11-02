@@ -57,6 +57,7 @@
       <p class="muted">Teller kamper spilleren er tatt ut til (avlyste kamper telles ikke). «Spilt» er kamper med status Spilt.</p>
       <div class="table-wrap"><table id="playerStats" class="stats"></table></div>
       <h3>Kampmatrise</h3>
+      <p class="muted">Bokstaven er posisjonen i kampen (K/F/M/A). Svak bokstav = innbytter.</p>
       <div class="toolbar">
         <div class="seg" id="matrixTeam">
           <button data-team="" class="active">Alle</button>
@@ -161,7 +162,20 @@
       <fieldset>
         <legend>Kamptropp <span id="squadCount" class="muted"></span></legend>
         <p id="squadLocked" class="muted" hidden>🔒 Bare evalueringsgruppen kan endre troppen.</p>
+        <div id="balance" class="balance"></div>
         <div id="squadPicker"></div>
+      </fieldset>
+      <fieldset id="boardBox">
+        <legend>Laguppstilling</legend>
+        <div class="board-tools">
+          <label>Formasjon <select id="formation"></select></label>
+          <button type="button" id="autoLineup" class="eval-only">⚡ Still opp automatisk</button>
+          <button type="button" id="clearLineup" class="eval-only">Tøm banen</button>
+        </div>
+        <p class="muted hint eval-only">Trykk på en spiller og så på en plass for å sette inn, flytte eller bytte.
+          Trykk på en spiller på banen og så på «Innbyttere» for å ta spilleren av.</p>
+        <div id="pitch" class="pitch"></div>
+        <div id="bench" class="bench"></div>
       </fieldset>
       <details id="logBox"><summary>Historikk</summary><ul id="logList"></ul></details>
       <div class="actions">

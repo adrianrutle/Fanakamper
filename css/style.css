@@ -140,3 +140,44 @@ body[data-role="reader"] .eval-only { display: none !important; }
 .access-grid label { display: flex; flex-direction: column; gap: 4px; }
 @media (max-width: 640px) { .access-grid { grid-template-columns: 1fr; } }
 .role { display: inline-block; padding: 2px 8px; border-radius: 99px; background: var(--accent); color: #fff; font-size: 13px; }
+
+/* Fordeling av posisjoner i troppen */
+.g-K { --g: #f59e0b; } .g-F { --g: #2563eb; } .g-M { --g: #16a34a; } .g-A { --g: #dc2626; } .g-none { --g: #94a3b8; }
+.balance { margin: 4px 0 8px; font-size: 13px; }
+.bal-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.bal { border: 1px solid var(--g); border-left-width: 4px; border-radius: 6px; padding: 2px 8px; }
+.bal small { color: var(--muted); }
+.bal.off { background: #fef3c7; color: #92400e; }
+.bal-row .small { padding: 4px 8px; font-size: 12px; margin-left: auto; }
+.issues { margin: 6px 0 0; padding-left: 0; list-style: none; color: #b45309; }
+.ok { margin: 6px 0 0; color: #15803d; }
+.warn { color: #d97706; }
+
+/* Taktikktavle */
+.board-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; font-size: 13px; }
+.board-tools label { display: flex; gap: 6px; align-items: center; }
+.board-tools select { width: auto; }
+.board-tools button { padding: 6px 10px; font-size: 13px; }
+.hint { font-size: 12px; margin: 0 0 8px; }
+.pitch { position: relative; width: 100%; max-width: 420px; margin: 0 auto; aspect-ratio: 3 / 4; border-radius: 8px; overflow: hidden;
+  background: repeating-linear-gradient(0deg, #2f8f46 0 12.5%, #2a8240 12.5% 25%); }
+.pitch-lines { position: absolute; inset: 4%; border: 2px solid rgba(255,255,255,.7); pointer-events: none; }
+.pitch-lines .mid { position: absolute; left: 0; right: 0; top: 50%; border-top: 2px solid rgba(255,255,255,.7); }
+.pitch-lines .circle { position: absolute; left: 50%; top: 50%; width: 22%; aspect-ratio: 1; transform: translate(-50%, -50%);
+  border: 2px solid rgba(255,255,255,.7); border-radius: 50%; }
+.pitch-lines .box { position: absolute; left: 28%; right: 28%; height: 13%; border: 2px solid rgba(255,255,255,.7); }
+.pitch-lines .box.top { top: -2px; } .pitch-lines .box.bottom { bottom: -2px; }
+.slot { position: absolute; transform: translate(-50%, -50%); background: none; border: 0; padding: 0; width: 64px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; color: #fff; }
+.slot .shirt { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700;
+  border: 2px dashed rgba(255,255,255,.8); background: rgba(0,0,0,.15); }
+.slot.filled .shirt { border: 2px solid #fff; background: var(--g); }
+.slot .nm { font-size: 11px; font-weight: 600; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0,0,0,.7); }
+.slot.picked .shirt, .chip.picked { outline: 3px solid #facc15; outline-offset: 1px; }
+.bench { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; min-height: 44px; }
+.bench-head { flex-basis: 100%; font-size: 13px; font-weight: 600; }
+.chip { padding: 4px 10px; border-radius: 16px; font-size: 13px; border: 1px solid var(--line); border-left: 4px solid var(--g); }
+.chip small { color: var(--muted); }
+body[data-role="reader"] .slot, body[data-role="reader"] .chip { cursor: default; }
+.matrix td.sub { opacity: .45; }

@@ -16,6 +16,10 @@ Appen kjører uavhengig av Claude – alt ligger i GitHub og Firebase under din 
 - Kamptropp velges fra spillerlisten (spillere fra eget lag vises først)
 - Hver spiller kan ha inntil tre posisjoner (f.eks. Midtstopper, Sentral midtbane, Keeper). I kamptroppen får hver spiller
   en kampposisjon – Keeper, Forsvar, Midtbane eller Angrep – foreslått ut fra førstevalget. Listene ligger i `js/config.js`.
+- Fordelingssjekk for 9er: troppen sammenlignes med formasjonen (én keeper, resten fordelt som forsvar-midtbane-angrep),
+  med advarsel ved skjev fordeling og knappen «Fordel posisjoner» som fordeler ut fra spillernes ønsker
+- Taktikktavle per kamp: velg formasjon (3-3-2, 3-2-3, 3-4-1, 2-4-2, 4-3-1, 2-3-3), still opp spillerne på banen og
+  ha resten som innbyttere. «Still opp automatisk» fyller banen ut fra posisjoner, ønsker og hvem som har startet færrest kamper
 - Historikk per kamp (hvem endret hva og når)
 - Filtrer på lag/status, vis tidligere kamper, eksport til CSV
 - Tilgang i to grupper (se under), håndhevet i databasereglene

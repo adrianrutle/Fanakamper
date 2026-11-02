@@ -39,6 +39,10 @@ export const POSITIONS = [
   { id: "S",  label: "Spiss",             group: "A" }
 ];
 
+// 9er-fotball: keeper + 8 utespillere. Formasjonen skrives forsvar-midtbane-angrep.
+export const FORMATIONS = ["3-3-2", "3-2-3", "3-4-1", "2-4-2", "4-3-1", "2-3-3"];
+export const DEFAULT_FORMATION = "3-3-2";
+
 // Rekkefølgen her er prosessen en kamp går gjennom.
 export const STATUSES = [
   { id: "ikkeplanlagt", label: "Ikke planlagt",     color: "#94a3b8" },

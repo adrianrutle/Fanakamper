@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Tilgang styres av dokumentet config/access:
     //   evaluators: [e-poster]  – evalueringsgruppen: tropper, spillere, opprette/slette kamper
-    //   readers:    [e-poster]  – øvrige: kan se alt og oppdatere kamper, men ikke endre tropper eller kampposisjoner
+    //   readers:    [e-poster]  – øvrige: kan se alt og oppdatere kamper, men ikke endre tropper, kampposisjoner eller oppstilling
     function email() {
       return request.auth.token.email.lower();
     }
@@ -28,7 +28,7 @@ service cloud.firestore {
       allow read: if isMember();
       allow create, delete: if isEval();
       allow update: if isEval() ||
-        (isMember() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["squad", "positions"]));
+        (isMember() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["squad", "positions", "formation", "lineup"]));
     }
     match /players/{id} {
       allow read: if isMember();
