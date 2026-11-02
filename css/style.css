@@ -61,9 +61,11 @@ input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(
 .card { background: var(--card); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
 .card textarea { margin: 6px 0; }
 .players { list-style: none; padding: 0; margin: 0; }
-.players li { display: flex; gap: 8px; align-items: center; padding: 4px 0; border-top: 1px solid var(--line); }
-.players li span { flex: 1; }
+.players li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+.players li .pname { flex: 1; }
 .players select { width: auto; }
+.players .ppos { flex-basis: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.players .ppos select { width: 100%; min-width: 0; font-size: 13px; padding: 4px; }
 .ghost { background: transparent; border: 0; }
 
 dialog { width: min(640px, 100vw); max-height: 100dvh; border: 0; border-radius: 12px; padding: 16px; background: var(--card); color: var(--text); }
@@ -73,8 +75,14 @@ dialog::backdrop { background: rgba(0,0,0,.4); }
 .grid label { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--muted); }
 .grid .wide { grid-column: 1 / -1; }
 fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 12px 0; }
-.squad { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px; }
-.squad label { display: flex; gap: 6px; align-items: center; padding: 4px; }
+.squad { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px; }
+.squad .pick { display: flex; gap: 4px; align-items: center; border-radius: 6px; }
+.squad .pick.on { background: rgba(37, 99, 235, .08); }
+.squad label { display: flex; gap: 6px; align-items: center; padding: 4px; flex: 1; min-width: 0; }
+.squad .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.squad .pname small { margin-left: 4px; font-size: 11px; }
+.squad .mpos { width: auto; font-size: 12px; padding: 2px 4px; visibility: hidden; }
+.squad .pick.on .mpos { visibility: visible; }
 .squad-group { margin: 8px 0 4px; font-size: 13px; font-weight: 600; }
 .squad-group.rest { color: var(--muted); font-weight: 500; }
 .squad .dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #94a3b8; flex: none; padding: 0; }

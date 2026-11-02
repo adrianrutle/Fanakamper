@@ -1,5 +1,5 @@
 import * as store from "./store.js";
-import { TEAMS, STATUSES, OWNER_EMAIL } from "./config.js";
+import { TEAMS, STATUSES, OWNER_EMAIL, POSITIONS, MATCH_POSITIONS } from "./config.js";
 import { parseWorkbook, loadXlsx, FIRST_UNPLANNED } from "./excel-import.js";
 import { spondRows, toIcs } from "./spond.js";
 
@@ -22,6 +22,12 @@ const canSquad = () => state.role === "owner" || state.role === "eval";
 const SPILT = STATUSES.findIndex((s) => s.id === "spilt");
 const teamRank = (t) => (TEAMS.includes(t) ? TEAMS.indexOf(t) : TEAMS.length);
 const byTeamAndName = (a, b) => (teamRank(a.team) - teamRank(b.team)) || a.name.localeCompare(b.name, "no");
+const posOf = (id) => POSITIONS.find((x) => x.id === id);
+// Spillerens posisjoner som korte koder, f.eks. «SM / OM / K»
+const posShort = (p) => (p.positions || []).filter(posOf).join(" / ");
+const posLong = (p) => (p.positions || []).map((id) => posOf(id)?.label).filter(Boolean).join(", ");
+// Forslag til kampposisjon: gruppen til spillerens førstevalg
+const defaultMatchPos = (p) => posOf((p?.positions || []).find(posOf))?.group || "";
 const ROLE_LABEL = { owner: "Eier (full tilgang)", eval: "Evalueringsgruppen – kan sette opp tropper", reader: "Lesetilgang til tropper" };
 
 // ---------- Oppstart ----------
@@ -54,7 +60,7 @@ async function onUser(user) {
     renderStats();
     if (dlg.open && !$$("#squadPicker input").length) {
       const m = state.matches.find((x) => x.id === state.editing);
-      renderSquadPicker(form.team.value, m?.squad || []);
+      renderSquadPicker(form.team.value, m?.squad || [], m?.positions || {});
     }
   }, onDbError);
   showView("matches");
@@ -245,7 +251,7 @@ function openMatch(id) {
   form.status.value = m.status || STATUSES[0].id;
   $("#deleteMatch").hidden = !id;
   $("#resultOpponent").textContent = m.opponent || "Motstander";
-  renderSquadPicker(m.team, m.squad || []);
+  renderSquadPicker(m.team, m.squad || [], m.positions || {});
   const log = m.log || [];
   $("#logBox").hidden = !log.length;
   $("#logList").innerHTML = log.slice().reverse().map((l) =>
@@ -255,21 +261,40 @@ function openMatch(id) {
   dlg.showModal();
 }
 
-form.team.onchange = () => renderSquadPicker(form.team.value, selectedSquad());
+form.team.onchange = () => renderSquadPicker(form.team.value, selectedSquad(), selectedPositions());
 form.opponent.oninput = () => ($("#resultOpponent").textContent = form.opponent.value || "Motstander");
 
 function selectedSquad() {
   return $$("#squadPicker input:checked").map((i) => i.value);
 }
 
-function renderSquadPicker(team, chosen) {
+// Kampposisjon for hver uttatt spiller, f.eks. { spillerId: "M" }
+function selectedPositions() {
+  const out = {};
+  for (const s of $$("#squadPicker select.mpos")) {
+    if (s.closest(".pick").querySelector("input").checked && s.value) out[s.dataset.id] = s.value;
+  }
+  return out;
+}
+
+function renderSquadPicker(team, chosen, positions = {}) {
   const set = new Set(chosen);
   // Alle spillere kan velges; spillere på kampens lag vises først som anbefalt
   const own = state.players.filter((p) => p.team === team).sort(byTeamAndName);
   const rest = state.players.filter((p) => p.team !== team).sort(byTeamAndName);
-  const box = (p) => `
-      <label title="${esc(p.team || "Uten lag")}"><input type="checkbox" value="${p.id}" ${set.has(p.id) ? "checked" : ""} ${canSquad() ? "" : "disabled"}>
-        <span class="dot team-${esc(p.team)}"></span>${esc(p.name)}</label>`;
+  const box = (p) => {
+    const on = set.has(p.id);
+    const pos = positions[p.id] || "";
+    return `<div class="pick${on ? " on" : ""}">
+      <label title="${esc((p.team || "Uten lag") + (posLong(p) ? " · " + posLong(p) : ""))}">
+        <input type="checkbox" value="${p.id}" ${on ? "checked" : ""} ${canSquad() ? "" : "disabled"}>
+        <span class="dot team-${esc(p.team)}"></span><span class="pname">${esc(p.name)}
+        ${posShort(p) ? `<small class="muted">${esc(posShort(p))}</small>` : ""}</span></label>
+      <select class="mpos" data-id="${p.id}" ${canSquad() ? "" : "disabled"} aria-label="Posisjon i kampen">
+        <option value="">–</option>${MATCH_POSITIONS.map((x) =>
+          `<option value="${x.id}" ${x.id === pos ? "selected" : ""}>${x.label}</option>`).join("")}
+      </select></div>`;
+  };
   if (!state.players.length) {
     $("#squadPicker").innerHTML = `<p class="muted">Legg til spillere under «Spillere» først.</p>`;
   } else {
@@ -280,8 +305,20 @@ function renderSquadPicker(team, chosen) {
         <div class="squad">${rest.map(box).join("")}</div>` : "");
   }
   $("#squadLocked").hidden = canSquad();
-  const count = () => ($("#squadCount").textContent = `(${selectedSquad().length} valgt)`);
-  $$("#squadPicker input").forEach((i) => (i.onchange = count));
+  const count = () => {
+    const pos = Object.values(selectedPositions());
+    const per = MATCH_POSITIONS.map((x) => [x.id, pos.filter((v) => v === x.id).length]).filter(([, n]) => n);
+    $("#squadCount").textContent = `(${selectedSquad().length} valgt${per.length ? ": " + per.map(([k, n]) => `${k} ${n}`).join(" · ") : ""})`;
+  };
+  $$("#squadPicker input").forEach((i) => (i.onchange = () => {
+    const pick = i.closest(".pick");
+    pick.classList.toggle("on", i.checked);
+    // Foreslå posisjon ut fra spillerens førstevalg når spilleren tas ut
+    const sel = pick.querySelector("select.mpos");
+    if (i.checked && !sel.value) sel.value = defaultMatchPos(state.players.find((p) => p.id === i.value));
+    count();
+  }));
+  $$("#squadPicker select.mpos").forEach((s) => (s.onchange = count));
   count();
 }
 
@@ -291,7 +328,9 @@ form.onsubmit = async (e) => {
   for (const el of form.elements) if (el.name) data[el.name] = el.value.trim();
   const old = state.editing ? state.matches.find((x) => x.id === state.editing) : null;
   // Var spillerlisten ikke lastet da kampen ble åpnet, finnes ingen avkrysningsbokser – behold da troppen
-  data.squad = canSquad() && $$("#squadPicker input").length ? selectedSquad() : (old?.squad || []);
+  const picker = canSquad() && $$("#squadPicker input").length;
+  data.squad = picker ? selectedSquad() : (old?.squad || []);
+  data.positions = picker ? selectedPositions() : (old?.positions || {});
   data.updatedAt = new Date().toISOString();
   const log = [...(old?.log || [])];
   if (hasResult(data)) {
@@ -413,13 +452,13 @@ function renderStats() {
   // Spillere: antall kamper per nivå
   const players = state.players.slice().sort(byTeamAndName);
   const count = (p, pred) => active.filter((m) => (m.squad || []).includes(p.id) && pred(m)).length;
-  $("#playerStats").innerHTML = `<tr><th>Spiller</th><th>Nivå</th>
+  $("#playerStats").innerHTML = `<tr><th>Spiller</th><th>Nivå</th><th>Posisjoner</th>
       ${TEAMS.map((t) => `<th><span class="team team-${t}">${t}</span></th>`).join("")}
       <th>Totalt</th><th>Spilt</th></tr>` +
     players.map((p) => {
       const per = TEAMS.map((t) => count(p, (m) => m.team === t));
       const total = per.reduce((a, b) => a + b, 0);
-      return `<tr class="${total ? "" : "zero"}"><th>${esc(p.name)}</th><td>${esc(p.team)}</td>
+      return `<tr class="${total ? "" : "zero"}"><th>${esc(p.name)}</th><td>${esc(p.team)}</td><td title="${esc(posLong(p))}">${esc(posShort(p))}</td>
         ${per.map((n) => `<td>${n || ""}</td>`).join("")}
         <td><b>${total}</b></td><td>${count(p, (m) => m.status === "spilt") || ""}</td></tr>`;
     }).join("");
@@ -435,7 +474,7 @@ function renderStats() {
       const n = cells.filter(Boolean).length;
       if (!n && state.matrixTeam && p.team !== state.matrixTeam) return "";
       return `<tr class="${n ? "" : "zero"}"><th>${esc(p.name)}</th>${cells.map((on, i) =>
-        `<td class="${on ? "on team-col-" + esc(cols[i].team) : ""}">${on ? "●" : ""}</td>`).join("")}<td><b>${n}</b></td></tr>`;
+        `<td class="${on ? "on team-col-" + esc(cols[i].team) : ""}">${on ? esc(cols[i].positions?.[p.id] || "●") : ""}</td>`).join("")}<td><b>${n}</b></td></tr>`;
     }).join("");
 }
 
@@ -454,13 +493,22 @@ function renderPlayers() {
     if (!ps.length) return "";
     return `<div class="card"><h3>${esc(t)} <span class="muted">(${ps.length})</span></h3>
       <ul class="players">${ps.map((p) => `<li>
-        <span>${esc(p.name)}</span>
-        <select data-id="${p.id}" ${canSquad() ? "" : "disabled"}>${TEAMS.map((x) =>
+        <span class="pname">${esc(p.name)}</span>
+        <select class="pteam" data-id="${p.id}" ${canSquad() ? "" : "disabled"}>${TEAMS.map((x) =>
           `<option ${x === p.team ? "selected" : ""}>${x}</option>`).join("")}</select>
-        <button class="ghost del eval-only" data-id="${p.id}" title="Fjern">✕</button></li>`).join("")}</ul></div>`;
+        <button class="ghost del eval-only" data-id="${p.id}" title="Fjern">✕</button>
+        <div class="ppos">${[0, 1, 2].map((i) => `<select data-id="${p.id}" data-i="${i}" ${canSquad() ? "" : "disabled"}
+            aria-label="Posisjon ${i + 1}"><option value="">${i + 1}. posisjon</option>${POSITIONS.map((x) =>
+            `<option value="${x.id}" ${p.positions?.[i] === x.id ? "selected" : ""}>${x.id} · ${x.label}</option>`).join("")}</select>`).join("")}
+        </div></li>`).join("")}</ul></div>`;
   }).join("");
   $("#playerList").innerHTML = groups || `<p class="muted center">Ingen spillere ennå.</p>`;
-  $$("#playerList select").forEach((s) => (s.onchange = () => store.update("players", s.dataset.id, { team: s.value })));
+  $$("#playerList select.pteam").forEach((s) => (s.onchange = () => store.update("players", s.dataset.id, { team: s.value })));
+  $$("#playerList .ppos select").forEach((s) => (s.onchange = () => {
+    // Lagre de tre valgene samlet, uten tomme felt og uten dubletter
+    const vals = $$(`#playerList .ppos select[data-id="${s.dataset.id}"]`).map((x) => x.value);
+    store.update("players", s.dataset.id, { positions: [...new Set(vals.filter(Boolean))] });
+  }));
   $$("#playerList .del").forEach((b) => (b.onclick = () => {
     if (confirm("Fjerne spilleren?")) store.remove("players", b.dataset.id);
   }));
@@ -565,7 +613,7 @@ $("#exportCsv").onclick = () => {
   const rows = [[...cols, "squad"], ...state.matches
     .slice().sort((a, b) => sortKey(a).localeCompare(sortKey(b)))
     .map((m) => [...cols.map((c) => c === "status" ? statusOf(m.status).label : m[c] ?? ""),
-      (m.squad || []).map(name).join(", ")])];
+      (m.squad || []).map((id) => name(id) + (m.positions?.[id] ? ` (${m.positions[id]})` : "")).join(", ")])];
   const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv" }));

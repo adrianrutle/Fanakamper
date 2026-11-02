@@ -14,6 +14,8 @@ Appen kjører uavhengig av Claude – alt ligger i GitHub og Firebase under din 
 - Statusprosess: Planlagt internt → Forespørsel sendt → Avtalt → Klar (tropp + bane) → Spilt (eller Avlyst).
   Knappen «→ neste status» på hvert kampkort flytter kampen ett steg videre.
 - Kamptropp velges fra spillerlisten (spillere fra eget lag vises først)
+- Hver spiller kan ha inntil tre posisjoner (f.eks. Midtstopper, Sentral midtbane, Keeper). I kamptroppen får hver spiller
+  en kampposisjon – Keeper, Forsvar, Midtbane eller Angrep – foreslått ut fra førstevalget. Listene ligger i `js/config.js`.
 - Historikk per kamp (hvem endret hva og når)
 - Filtrer på lag/status, vis tidligere kamper, eksport til CSV
 - Tilgang i to grupper (se under), håndhevet i databasereglene
