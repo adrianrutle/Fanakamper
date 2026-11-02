@@ -181,3 +181,9 @@ body[data-role="reader"] .eval-only { display: none !important; }
 .chip small { color: var(--muted); }
 body[data-role="reader"] .slot, body[data-role="reader"] .chip { cursor: default; }
 .matrix td.sub { opacity: .45; }
+.matrix.editable td[data-m] { cursor: pointer; } .matrix.editable td[data-m]:hover { outline: 2px solid #2563eb; outline-offset: -2px; }
+.slot, .chip { touch-action: none; user-select: none; -webkit-user-select: none; }
+.slot.dragging, .chip.dragging { opacity: .35; }
+.ghost-drag { position: fixed !important; z-index: 1000; pointer-events: none; transform: translate(-50%, -50%) scale(1.1); }
+.chip.ghost-drag { background: var(--card); box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+.slot.ghost-drag { color: #fff; }

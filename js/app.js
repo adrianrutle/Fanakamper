@@ -58,6 +58,7 @@ async function onUser(user) {
   store.subscribe("players", (list) => {
     state.players = list;
     migrateBegge();
+    cleanupPlayers();
     renderPlayers();
     renderStats();
     if (dlg.open && !$$("#squadPicker input").length) {
@@ -98,6 +99,30 @@ async function migrateBegge() {
   try {
     for (const p of todo) await store.update("players", p.id, { team: "Blå" });
   } finally { movingBegge = false; }
+}
+
+// Engangsrydding (2. nov. 2026): slett Stas og Emilian, og gi Youssef posisjonen Keeper.
+// Eieren får spørsmål før noe endres. Kan fjernes når det er gjort.
+let cleaning = false;
+async function cleanupPlayers() {
+  if (state.role !== "owner" || cleaning || localStorage.getItem("fk_cleanup_2026_11_02")) return;
+  const byFirst = (n) => state.players.filter((p) => p.name.trim().split(/\s+/)[0].toLowerCase() === n);
+  const del = ["stas", "emilian"].flatMap((n) => { const m = byFirst(n); return m.length === 1 ? m : []; });
+  const yo = byFirst("youssef");
+  const keeper = yo.length === 1 && !(yo[0].positions || []).includes("K") ? yo[0] : null;
+  if (!del.length && !keeper) return;
+  cleaning = true;
+  const what = [...del.map((p) => `• Slette ${p.name}`), ...(keeper ? [`• Gi ${keeper.name} posisjonen Keeper (K)`] : [])];
+  try {
+    if (confirm(`Rydding av spillerlisten:\n${what.join("\n")}\n\nGjøre dette nå?`)) {
+      for (const p of del) await store.remove("players", p.id);
+      if (keeper) {
+        const pos = keeper.positions || [];
+        await store.update("players", keeper.id, { positions: pos.length < 3 ? [...pos, "K"] : [...pos.slice(0, 2), "K"] });
+      }
+    }
+    localStorage.setItem("fk_cleanup_2026_11_02", "1");
+  } finally { cleaning = false; }
 }
 
 // Rollen avgjøres av listene i config/access. Reglene i firestore.rules håndhever det samme på serveren.
@@ -256,6 +281,7 @@ function openMatch(id) {
   $("#resultOpponent").textContent = m.opponent || "Motstander";
   $("#formation").value = FORMATIONS.includes(m.formation) ? m.formation : DEFAULT_FORMATION;
   board.lineup = [...(m.lineup || [])];
+  board.xy = [...(m.slotXY || [])];
   board.picked = null;
   renderSquadPicker(m.team, m.squad || [], m.positions || {});
   const log = m.log || [];
@@ -335,6 +361,7 @@ form.onsubmit = async (e) => {
     data.positions = selectedPositions();
     data.formation = $("#formation").value;
     data.lineup = currentLineup();
+    data.slotXY = slots(data.formation).map((_, i) => board.xy[i] || null);
   } else if (!old) {
     data.squad = [];
   }
@@ -358,7 +385,7 @@ form.onsubmit = async (e) => {
 };
 
 // ---------- Fordeling og laguppstilling ----------
-const board = { lineup: [], picked: null };
+const board = { lineup: [], picked: null, xy: [], dragged: false };
 const playerById = (id) => state.players.find((p) => p.id === id);
 const firstName = (id) => (playerById(id)?.name || "?").split(" ")[0];
 const posSelect = (id) => $(`#squadPicker select.mpos[data-id="${id}"]`);
@@ -421,7 +448,7 @@ function renderBoard() {
     sl.map((s, i) => {
       const id = board.lineup[i];
       return `<button type="button" class="slot g-${s.g}${id ? " filled" : ""}${id && id === pk ? " picked" : ""}" data-slot="${i}"
-        style="left:${s.x}%;top:${s.y}%" title="${esc(s.pos)}">
+        style="left:${board.xy[i]?.x ?? s.x}%;top:${board.xy[i]?.y ?? s.y}%" title="${esc(s.pos)}">
         <span class="shirt">${id ? esc(firstName(id).slice(0, 2)) : esc(s.pos)}</span>
         <span class="nm">${id ? esc(firstName(id)) : "&nbsp;"}</span></button>`;
     }).join("");
@@ -429,14 +456,21 @@ function renderBoard() {
     (bench.length ? bench.map((id) => `<button type="button" class="chip g-${pos[id] || "none"}${id === pk ? " picked" : ""}" data-id="${id}">
       ${esc(playerById(id)?.name || id)} <small>${esc(pos[id] || "–")}</small></button>`).join("")
       : `<span class="muted">${selectedSquad().length ? "Alle i troppen er på banen." : "Velg kamptropp først."}</span>`);
+  $("#resetXY").hidden = !board.xy.some(Boolean);
   if (!canSquad()) return;
-  $$("#pitch .slot").forEach((b) => (b.onclick = () => clickSlot(+b.dataset.slot)));
+  $$("#pitch .slot").forEach((b) => {
+    b.onclick = () => { if (!board.dragged) clickSlot(+b.dataset.slot); };
+    b.onpointerdown = (e) => startDrag(e, b, { slot: +b.dataset.slot, id: board.lineup[+b.dataset.slot] });
+  });
+  $$("#bench .chip").forEach((b) => (b.onpointerdown = (e) => startDrag(e, b, { id: b.dataset.id })));
   $$("#bench .chip").forEach((b) => (b.onclick = (e) => {
     e.stopPropagation();
+    if (board.dragged) return;
     board.picked = board.picked === b.dataset.id ? null : b.dataset.id;
     renderBoard();
   }));
   $("#bench").onclick = () => {
+    if (board.dragged) return;
     // Spiller valgt på banen + trykk på benken = ta spilleren av
     if (!board.picked || !onPitch.has(board.picked)) return;
     board.lineup = board.lineup.map((x) => (x === board.picked ? "" : x));
@@ -453,6 +487,12 @@ function clickSlot(i) {
     return;
   }
   if (pk === occupant) { board.picked = null; renderBoard(); return; }
+  placePlayer(pk, i);
+}
+
+// Setter spilleren på plass i; står spilleren alt på banen, bytter de to plass
+function placePlayer(pk, i) {
+  const occupant = board.lineup[i] || "";
   const from = board.lineup.indexOf(pk);
   board.lineup[i] = pk;
   if (from >= 0) board.lineup[from] = occupant; // bytt plass på banen
@@ -461,8 +501,70 @@ function clickSlot(i) {
   renderBalance(); renderBoard();
 }
 
-$("#formation").onchange = () => { syncLineupPositions(); renderBalance(); renderBoard(); };
+// Dra og slipp (mus og berøring): slipp på en plass = sett inn/bytt, på gresset = flytt plassen dit,
+// på «Innbyttere» = ta av banen. Et vanlig trykk uten å dra fungerer som før.
+function startDrag(e, el, src) {
+  if (e.button > 0) return;
+  const x0 = e.clientX, y0 = e.clientY;
+  let ghost = null;
+  board.dragged = false;
+  const move = (ev) => {
+    if (!ghost) {
+      if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 8) return;
+      board.dragged = true;
+      ghost = el.cloneNode(true);
+      ghost.classList.add("ghost-drag");
+      dlg.append(ghost); // dialogen ligger øverst, så skyggen må ligge i den
+      el.classList.add("dragging");
+    }
+    ev.preventDefault();
+    ghost.style.left = ev.clientX + "px";
+    ghost.style.top = ev.clientY + "px";
+  };
+  const up = (ev) => {
+    el.removeEventListener("pointermove", move);
+    el.removeEventListener("pointerup", up);
+    el.removeEventListener("pointercancel", up);
+    if (!ghost) return;
+    ghost.remove();
+    el.classList.remove("dragging");
+    drop(src, ev.clientX, ev.clientY);
+    // Klikket som følger etter slipp skal ikke tolkes som et trykk
+    setTimeout(() => (board.dragged = false), 0);
+  };
+  el.setPointerCapture?.(e.pointerId);
+  el.addEventListener("pointermove", move);
+  el.addEventListener("pointerup", up);
+  el.addEventListener("pointercancel", up);
+}
+
+function drop(src, x, y) {
+  const target = document.elementFromPoint(x, y);
+  const slotEl = target?.closest("#pitch .slot");
+  const pitch = $("#pitch");
+  board.picked = null;
+  if (slotEl && +slotEl.dataset.slot !== src.slot) {
+    if (src.id) placePlayer(src.id, +slotEl.dataset.slot);
+    else { renderBoard(); }
+    return;
+  }
+  if (target?.closest("#bench")) {
+    if (src.slot !== undefined && src.id) board.lineup[src.slot] = "";
+    renderBalance(); renderBoard();
+    return;
+  }
+  if (src.slot !== undefined && target && pitch.contains(target)) {
+    // Flytt plassen fritt på banen
+    const r = pitch.getBoundingClientRect();
+    const clamp = (v) => Math.min(95, Math.max(5, Math.round(v)));
+    board.xy[src.slot] = { x: clamp(((x - r.left) / r.width) * 100), y: clamp(((y - r.top) / r.height) * 100) };
+  }
+  renderBoard();
+}
+
+$("#formation").onchange = () => { board.xy = []; syncLineupPositions(); renderBalance(); renderBoard(); };
 $("#clearLineup").onclick = () => { board.lineup = []; board.picked = null; renderBoard(); };
+$("#resetXY").onclick = () => { board.xy = []; renderBoard(); };
 $("#autoLineup").onclick = () => {
   const f = $("#formation").value;
   const players = selectedSquad().map(playerById).filter(Boolean);
@@ -598,7 +700,7 @@ function renderStats() {
   const isSub = (m, id) => (m.lineup || []).some(Boolean) && !m.lineup.includes(id);
   const cols = active.filter((m) => !state.matrixTeam || m.team === state.matrixTeam);
   $("#matrix").innerHTML = `<tr><th>Spiller</th>${cols.map((m) =>
-      `<th class="col team-col-${esc(m.team)}" title="${esc(m.team)} – ${esc(m.opponent)}">
+      `<th class="col team-col-${esc(m.team)}" title="${esc(m.team)} – ${esc(m.opponent)}${m.squad?.length ? ` (${m.squad.length} i troppen)` : ""}">
         ${m.date ? m.date.slice(8, 10) + "." + m.date.slice(5, 7) : "?"}<br><small>${esc(m.team[0])}</small></th>`).join("")}
       <th>Σ</th></tr>` +
     players.map((p) => {
@@ -606,8 +708,31 @@ function renderStats() {
       const n = cells.filter(Boolean).length;
       if (!n && state.matrixTeam && p.team !== state.matrixTeam) return "";
       return `<tr class="${n ? "" : "zero"}"><th>${esc(p.name)}</th>${cells.map((on, i) =>
-        `<td class="${on ? "on team-col-" + esc(cols[i].team) : ""}${on && isSub(cols[i], p.id) ? " sub" : ""}">${on ? esc(cols[i].positions?.[p.id] || "●") : ""}</td>`).join("")}<td><b>${n}</b></td></tr>`;
+        `<td data-m="${cols[i].id}" data-p="${p.id}" class="${on ? "on team-col-" + esc(cols[i].team) : ""}${on && isSub(cols[i], p.id) ? " sub" : ""}">${on ? esc(cols[i].positions?.[p.id] || "●") : ""}</td>`).join("")}<td><b>${n}</b></td></tr>`;
     }).join("");
+  $("#matrix").classList.toggle("editable", canSquad());
+  if (canSquad()) $$("#matrix td[data-m]").forEach((td) => (td.onclick = () => toggleInSquad(td.dataset.m, td.dataset.p)));
+}
+
+// Evalueringsgruppen kan ta ut / fjerne spillere direkte i kampmatrisen
+async function toggleInSquad(matchId, playerId) {
+  const m = state.matches.find((x) => x.id === matchId);
+  const p = playerById(playerId);
+  if (!m || !p) return;
+  const squad = m.squad || [];
+  const inSquad = squad.includes(playerId);
+  const data = { updatedAt: new Date().toISOString() };
+  if (inSquad) {
+    data.squad = squad.filter((id) => id !== playerId);
+    data.lineup = (m.lineup || []).map((id) => (id === playerId ? "" : id));
+    data.log = [...(m.log || []), logEntry(`Tropp: − ${p.name}`)];
+  } else {
+    data.squad = [...squad, playerId];
+    const g = defaultMatchPos(p);
+    if (g) data.positions = { ...(m.positions || {}), [playerId]: g };
+    data.log = [...(m.log || []), logEntry(`Tropp: + ${p.name}`)];
+  }
+  await store.update("matches", matchId, data);
 }
 
 // ---------- Spillere ----------

@@ -53,11 +53,9 @@
     <section id="stats" class="view" hidden>
       <h3>Resultater</h3>
       <div id="resultStats"></div>
-      <h3>Spillere – kamper per nivå</h3>
-      <p class="muted">Teller kamper spilleren er tatt ut til (avlyste kamper telles ikke). «Spilt» er kamper med status Spilt.</p>
-      <div class="table-wrap"><table id="playerStats" class="stats"></table></div>
       <h3>Kampmatrise</h3>
-      <p class="muted">Bokstaven er posisjonen i kampen (K/F/M/A). Svak bokstav = innbytter.</p>
+      <p class="muted">Bokstaven er posisjonen i kampen (K/F/M/A). Svak bokstav = innbytter.
+        <span class="eval-only">Trykk i en rute for å ta spilleren ut til kampen eller fjerne spilleren fra troppen.</span></p>
       <div class="toolbar">
         <div class="seg" id="matrixTeam">
           <button data-team="" class="active">Alle</button>
@@ -67,6 +65,9 @@
         </div>
       </div>
       <div class="table-wrap"><table id="matrix" class="stats matrix"></table></div>
+      <h3>Spillere – kamper per nivå</h3>
+      <p class="muted">Teller kamper spilleren er tatt ut til (avlyste kamper telles ikke). «Spilt» er kamper med status Spilt.</p>
+      <div class="table-wrap"><table id="playerStats" class="stats"></table></div>
     </section>
 
     <section id="players" class="view" hidden>
@@ -171,9 +172,11 @@
           <label>Formasjon <select id="formation"></select></label>
           <button type="button" id="autoLineup" class="eval-only">⚡ Still opp automatisk</button>
           <button type="button" id="clearLineup" class="eval-only">Tøm banen</button>
+          <button type="button" id="resetXY" class="eval-only" hidden>↺ Standardplasser</button>
         </div>
-        <p class="muted hint eval-only">Trykk på en spiller og så på en plass for å sette inn, flytte eller bytte.
-          Trykk på en spiller på banen og så på «Innbyttere» for å ta spilleren av.</p>
+        <p class="muted hint eval-only">Dra spillere mellom benken og banen, eller oppå hverandre for å bytte.
+          Slipp en spiller på åpent gress for å flytte den dit. Dra til «Innbyttere» for å ta spilleren av.
+          (Trykk på spiller og så på plass fungerer også.)</p>
         <div id="pitch" class="pitch"></div>
         <div id="bench" class="bench"></div>
       </fieldset>
