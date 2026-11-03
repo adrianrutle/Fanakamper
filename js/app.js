@@ -18,7 +18,7 @@ const outcome = (m) => {
   return d > 0 ? "S" : d < 0 ? "T" : "U";
 };
 
-const state = { user: null, matches: [], players: [], team: "", status: "", showPast: false, matrixTeam: "", editing: null, role: null, access: null };
+const state = { user: null, matches: [], players: [], team: "", status: "", showPast: false, matrixTeams: new Set(), playerTeams: new Set(), playerSort: "name", editing: null, role: null, access: null };
 const canSquad = () => state.role === "owner" || state.role === "eval";
 const SPILT = STATUSES.findIndex((s) => s.id === "spilt");
 const teamRank = (t) => (TEAMS.includes(t) ? TEAMS.indexOf(t) : TEAMS.length);
@@ -650,12 +650,47 @@ $("#deleteMatch").onclick = async () => {
   dlg.close();
 };
 
-// ---------- Statistikk ----------
-$$("#matrixTeam button").forEach((b) => (b.onclick = () => {
-  state.matrixTeam = b.dataset.team;
-  $$("#matrixTeam button").forEach((x) => x.classList.toggle("active", x === b));
-  renderStats();
-}));
+// ---------- Laguttak (statistikk) ----------
+// Valgene huskes i denne nettleseren
+try {
+  const saved = JSON.parse(localStorage.getItem("fk_laguttak") || "{}");
+  state.matrixTeams = new Set(saved.matches || []);
+  state.playerTeams = new Set(saved.players || []);
+  state.playerSort = saved.sort === "team" ? "team" : "name";
+} catch (e) { /* ignorer */ }
+const saveStatsPrefs = () => {
+  try {
+    localStorage.setItem("fk_laguttak", JSON.stringify({
+      matches: [...state.matrixTeams], players: [...state.playerTeams], sort: state.playerSort }));
+  } catch (e) { /* ignorer */ }
+};
+
+// Flervalg: «Alle» tømmer utvalget, en farge slås av/på. Ingen farge valgt = alle.
+function multiFilter(sel, set) {
+  const paint = () => $$(`${sel} button`).forEach((x) =>
+    x.classList.toggle("active", x.dataset.team ? set.has(x.dataset.team) : !set.size));
+  $$(`${sel} button`).forEach((b) => (b.onclick = () => {
+    const t = b.dataset.team;
+    if (!t) set.clear();
+    else if (set.has(t)) set.delete(t);
+    else set.add(t);
+    if (set.size === TEAMS.length) set.clear(); // alle valgt = «Alle»
+    paint(); saveStatsPrefs(); renderStats();
+  }));
+  paint();
+}
+multiFilter("#matrixTeam", state.matrixTeams);
+multiFilter("#playerFilter", state.playerTeams);
+$$("#playerSort button").forEach((b) => {
+  b.classList.toggle("active", b.dataset.sort === state.playerSort);
+  b.onclick = () => {
+    state.playerSort = b.dataset.sort;
+    $$("#playerSort button").forEach((x) => x.classList.toggle("active", x === b));
+    saveStatsPrefs(); renderStats();
+  };
+});
+const byName = (a, b) => a.name.localeCompare(b.name, "no");
+const pdot = (p) => `<span class="pdot team-${esc(p.team)}" title="${esc(p.team || "Uten lag")}"></span>`;
 
 function renderStats() {
   const active = state.matches.filter((m) => m.status !== "avlyst")
@@ -683,7 +718,9 @@ function renderStats() {
       : `<p class="muted">Ingen resultater registrert ennå. Åpne en kamp og fyll inn resultatet.</p>`}`;
 
   // Spillere: antall kamper per nivå
-  const players = state.players.slice().sort(byTeamAndName);
+  const players = state.players
+    .filter((p) => !state.playerTeams.size || state.playerTeams.has(p.team))
+    .sort(state.playerSort === "team" ? byTeamAndName : byName);
   const count = (p, pred) => active.filter((m) => (m.squad || []).includes(p.id) && pred(m)).length;
   $("#playerStats").innerHTML = `<tr><th>Spiller</th><th>Nivå</th><th>Posisjoner</th>
       ${TEAMS.map((t) => `<th><span class="team team-${t}">${t}</span></th>`).join("")}
@@ -691,14 +728,14 @@ function renderStats() {
     players.map((p) => {
       const per = TEAMS.map((t) => count(p, (m) => m.team === t));
       const total = per.reduce((a, b) => a + b, 0);
-      return `<tr class="${total ? "" : "zero"}"><th>${esc(p.name)}</th><td>${esc(p.team)}</td><td title="${esc(posLong(p))}">${esc(posShort(p))}</td>
+      return `<tr class="${total ? "" : "zero"}"><th>${pdot(p)}${esc(p.name)}</th><td>${esc(p.team)}</td><td title="${esc(posLong(p))}">${esc(posShort(p))}</td>
         ${per.map((n) => `<td>${n || ""}</td>`).join("")}
         <td><b>${total}</b></td><td>${count(p, (m) => m.status === "spilt") || ""}</td></tr>`;
     }).join("");
 
   // Matrise: spillere × kamper (innbyttere vises svakere når kampen har oppstilling)
   const isSub = (m, id) => (m.lineup || []).some(Boolean) && !m.lineup.includes(id);
-  const cols = active.filter((m) => !state.matrixTeam || m.team === state.matrixTeam);
+  const cols = active.filter((m) => !state.matrixTeams.size || state.matrixTeams.has(m.team));
   // Antall kamper står i den faste navnekolonnen, så det alltid er synlig når tabellen rulles sidelengs.
   // Hver kampkolonne viser dato, lag, bane og antall i troppen.
   $("#matrix").innerHTML = `<tr><th><div class="pcell">Spiller <span class="nbadge head" title="Antall kamper">Kamper</span></div></th>${cols.map((m) =>
@@ -709,8 +746,9 @@ function renderStats() {
     players.map((p) => {
       const cells = cols.map((m) => (m.squad || []).includes(p.id));
       const n = cells.filter(Boolean).length;
-      if (!n && state.matrixTeam && p.team !== state.matrixTeam) return "";
-      return `<tr class="${n ? "" : "zero"}"><th><div class="pcell"><span class="pn">${esc(p.name)}</span><span class="nbadge${n ? "" : " empty"}">${n}</span></div></th>${cells.map((on, i) =>
+      // Uten spillerfilter: skjul spillere uten kamper som ikke hører til noen av de valgte kampfargene
+      if (!n && !state.playerTeams.size && state.matrixTeams.size && !state.matrixTeams.has(p.team)) return "";
+      return `<tr class="${n ? "" : "zero"}"><th><div class="pcell"><span class="pn">${pdot(p)}${esc(p.name)}</span><span class="nbadge${n ? "" : " empty"}">${n}</span></div></th>${cells.map((on, i) =>
         `<td data-m="${cols[i].id}" data-p="${p.id}" class="${on ? "on team-col-" + esc(cols[i].team) : ""}${on && isSub(cols[i], p.id) ? " sub" : ""}">${on ? esc(cols[i].positions?.[p.id] || "●") : ""}</td>`).join("")}</tr>`;
     }).join("");
   $("#matrix").classList.toggle("editable", canSquad());

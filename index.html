@@ -15,7 +15,7 @@
     <div class="brand">⚽ Fana G2014</div>
     <nav id="tabs" hidden>
       <button data-view="matches" class="active">Kamper</button>
-      <button data-view="stats">Statistikk</button>
+      <button data-view="stats">Laguttak</button>
       <button data-view="players">Spillere</button>
       <button data-view="settings">Innstillinger</button>
     </nav>
@@ -56,14 +56,28 @@
       <h3>Kampmatrise</h3>
       <p class="muted">Tallet ved navnet er antall kamper; tallet øverst i hver kolonne er antall i troppen. Bokstaven er posisjonen i kampen (K/F/M/A), svak bokstav = innbytter.
         <span class="eval-only">Trykk i en rute for å ta spilleren ut til kampen eller fjerne spilleren fra troppen.</span></p>
-      <div class="toolbar">
-        <div class="seg" id="matrixTeam">
-          <button data-team="" class="active">Alle</button>
-          <button data-team="Hvit">Hvit</button>
-          <button data-team="Rød">Rød</button>
-          <button data-team="Blå">Blå</button>
-        </div>
+      <div class="toolbar filters">
+        <div class="flt"><span class="muted">Kamper</span>
+          <div class="seg multi" id="matrixTeam">
+            <button data-team="" class="active">Alle</button>
+            <button data-team="Hvit"><span class="pdot team-Hvit"></span>Hvit</button>
+            <button data-team="Rød"><span class="pdot team-Rød"></span>Rød</button>
+            <button data-team="Blå"><span class="pdot team-Blå"></span>Blå</button>
+          </div></div>
+        <div class="flt"><span class="muted">Spillere</span>
+          <div class="seg multi" id="playerFilter">
+            <button data-team="" class="active">Alle</button>
+            <button data-team="Hvit"><span class="pdot team-Hvit"></span>Hvit</button>
+            <button data-team="Rød"><span class="pdot team-Rød"></span>Rød</button>
+            <button data-team="Blå"><span class="pdot team-Blå"></span>Blå</button>
+          </div></div>
+        <div class="flt"><span class="muted">Sorter</span>
+          <div class="seg" id="playerSort">
+            <button data-sort="name" class="active">Navn</button>
+            <button data-sort="team">Farge</button>
+          </div></div>
       </div>
+      <p class="muted small-note">Trykk på flere farger for å vise flere samtidig. Filter og sortering gjelder begge tabellene under.</p>
       <div class="table-wrap"><table id="matrix" class="stats matrix"></table></div>
       <h3>Spillere – kamper per nivå</h3>
       <p class="muted">Teller kamper spilleren er tatt ut til (avlyste kamper telles ikke). «Spilt» er kamper med status Spilt.</p>

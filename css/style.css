@@ -197,3 +197,12 @@ body[data-role="reader"] .slot, body[data-role="reader"] .chip { cursor: default
 .matrix th.col .venue { display: block; max-width: 56px; margin: 2px auto 0; overflow: hidden; text-overflow: ellipsis; font-weight: 400; color: var(--muted); }
 .matrix th.col .cnt { display: inline-block; margin-top: 3px; min-width: 22px; padding: 1px 5px; border-radius: 10px; background: #0b3d91; color: #fff; font-size: 11px; font-weight: 700; }
 .matrix th.col .cnt.empty { background: var(--line); color: var(--muted); }
+/* Laguttak: fargedott per spiller og flervalgsfilter */
+.pdot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px;
+  border: 1px solid #94a3b8; flex: none; padding: 0; }
+.pdot.team-Hvit { background: #fff; }
+.seg .pdot { margin-right: 4px; }
+.filters { flex-wrap: wrap; gap: 8px 14px; }
+.flt { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.flt .seg button { padding: 6px 10px; }
+.small-note { font-size: 12px; margin: -4px 0 8px; }

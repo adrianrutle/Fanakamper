@@ -23,7 +23,7 @@ Appen kjører uavhengig av Claude – alt ligger i GitHub og Firebase under din 
 - Historikk per kamp (hvem endret hva og når)
 - Filtrer på lag/status, vis tidligere kamper, eksport til CSV
 - Tilgang i to grupper (se under), håndhevet i databasereglene
-- Resultater og statistikk: tabell per lag, kamper per spiller/nivå og kampmatrise
+- Laguttak (tidligere «Statistikk»): resultater per lag, kamper per spiller/nivå og kampmatrise
 - Eksport til Spond (regneark i Spond-malens format, eller kalenderfil)
 - Kan legges til på hjemskjermen på mobil
 
