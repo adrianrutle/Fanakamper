@@ -1,5 +1,6 @@
 import * as store from "./store.js";
 import { TEAMS, STATUSES, OWNER_EMAIL, POSITIONS, MATCH_POSITIONS, FORMATIONS, DEFAULT_FORMATION } from "./config.js";
+import { APP_VERSION } from "./version.js";
 import { slots, targets, countGroups, balanceIssues, autoAssign, autoLineup } from "./lineup.js";
 import { parseWorkbook, loadXlsx, FIRST_UNPLANNED } from "./excel-import.js";
 import { spondRows, toIcs } from "./spond.js";
@@ -38,6 +39,7 @@ fillSelect($("#matchForm").team, TEAMS.map((t) => [t, t]));
 fillSelect($("#matchForm").status, STATUSES.map((s) => [s.id, s.label]));
 fillSelect($("#formation"), FORMATIONS.map((f) => [f, f]));
 if (store.demoMode) $("#demoBanner").hidden = false;
+$("#appVersion").textContent = APP_VERSION;
 
 
 function fillSelect(sel, pairs, keepFirst = false) {
@@ -927,7 +929,19 @@ $("#exportCsv").onclick = () => {
 };
 
 if ("serviceWorker" in navigator && location.protocol === "https:") {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+  // Sjekk alltid etter ny versjon, og last siden på nytt én gang når en ny versjon tar over
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (hadController && !reloaded) { reloaded = true; location.reload(); }
+  });
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" })
+    .then((reg) => {
+      reg.update();
+      // Sjekk også når appen hentes fram igjen fra bakgrunnen (vanlig på mobil)
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update(); });
+    })
+    .catch(() => {});
 }
 
 // Start til slutt, så alle funksjoner og variabler over er klare
