@@ -255,3 +255,8 @@ body[data-role="reader"] .slot, body[data-role="reader"] .chip { cursor: default
 .auto .check { overflow-wrap: anywhere; }
 .auto .amatch { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .auto .check span { flex: 1; min-width: 0; white-space: normal; }
+/* Innlogging uten Google */
+.or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; margin: 18px auto 10px; max-width: 360px; }
+.or::before, .or::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.email-login { display: flex; flex-direction: column; gap: 8px; max-width: 360px; margin: 0 auto; }
+#loginInfo { max-width: 360px; margin: 10px auto; }

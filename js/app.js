@@ -158,10 +158,31 @@ function onDbError(e) {
 function showLoginError(e) {
   console.error(e);
   $("#login").hidden = false;
-  $("#loginError").textContent = e.message || String(e);
+  const msg = {
+    "auth/operation-not-allowed": "Innlogging med e-post er ikke slått på i Firebase ennå (Authentication → Sign-in method → E-post/passord + e-postkobling).",
+    "auth/invalid-email": "E-postadressen ser ikke riktig ut.",
+    "auth/invalid-action-code": "Innloggingslenken er brukt eller utløpt. Be om en ny.",
+    "auth/expired-action-code": "Innloggingslenken er utløpt. Be om en ny.",
+    "auth/unauthorized-continue-uri": "Nettadressen er ikke godkjent i Firebase (Authentication → Settings → Authorized domains)."
+  }[e.code];
+  $("#loginError").textContent = msg || e.message || String(e);
 }
 
 $("#loginBtn").onclick = () => store.signIn().catch(showLoginError);
+$("#emailLogin").onsubmit = async (e) => {
+  e.preventDefault();
+  const email = $("#loginEmail").value;
+  $("#loginError").textContent = "";
+  $("#loginInfo").textContent = "Sender …";
+  try {
+    await store.sendEmailLink(email);
+    $("#loginInfo").innerHTML = `Sjekk e-posten til <b>${esc(email)}</b> og trykk på lenken for å logge inn.
+      Finner du den ikke, se i søppelpost. Åpne lenken på samme telefon/PC som du ba om den fra.`;
+  } catch (err) {
+    $("#loginInfo").textContent = "";
+    showLoginError(err);
+  }
+};
 $("#userBtn").onclick = () => store.signOut();
 
 // ---------- Navigasjon ----------

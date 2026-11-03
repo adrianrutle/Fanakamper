@@ -1,4 +1,4 @@
-// Datalag: Firebase (Firestore + Google-innlogging) eller lokal demo-modus.
+// Datalag: Firebase (Firestore + innlogging med Google eller e-postlenke) eller lokal demo-modus.
 import { firebaseConfig, OWNER_EMAIL } from "./config.js";
 
 export const demoMode = !firebaseConfig.apiKey;
@@ -25,8 +25,39 @@ export async function init(onUser) {
   db = fs.initializeFirestore(firebaseApp, {
     localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() })
   });
+  await finishEmailLink();
   authMod.onAuthStateChanged(auth, (u) =>
     onUser(u ? { email: u.email, name: u.displayName, photo: u.photoURL } : null));
+}
+
+// ---- Innlogging med e-postlenke (uten Google-konto) ----
+const EMAIL_KEY = "fk_login_email";
+const cleanUrl = () => location.origin + location.pathname;
+
+export async function sendEmailLink(email) {
+  email = email.trim().toLowerCase();
+  if (demoMode) {
+    localStorage.setItem("fk_demo_user", JSON.stringify({ email, name: email }));
+    location.reload();
+    return;
+  }
+  await fb.sendSignInLinkToEmail(auth, email, { url: cleanUrl(), handleCodeInApp: true });
+  localStorage.setItem(EMAIL_KEY, email);
+}
+
+// Kommer brukeren fra lenken i e-posten, fullføres innloggingen her
+async function finishEmailLink() {
+  if (!fb.isSignInWithEmailLink(auth, location.href)) return;
+  // Åpnes lenken i en annen nettleser enn der den ble bestilt, må e-posten skrives inn på nytt
+  let email = localStorage.getItem(EMAIL_KEY);
+  if (!email) email = prompt("Bekreft e-postadressen du ba om innloggingslenke til:");
+  if (!email) return;
+  try {
+    await fb.signInWithEmailLink(auth, email.trim().toLowerCase(), location.href);
+    localStorage.removeItem(EMAIL_KEY);
+  } finally {
+    history.replaceState(null, "", cleanUrl()); // fjern engangskoden fra adressen
+  }
 }
 
 export async function signIn() {

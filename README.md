@@ -40,6 +40,8 @@ Appen kjører uavhengig av Claude – alt ligger i GitHub og Firebase under din 
 4. I Firestore, fanen **Regler**: lim inn innholdet i [firestore.rules](firestore.rules) og trykk **Publiser**.
 5. **Prosjektinnstillinger (tannhjul) → Dine apper → Web (`</>`)** → registrer app → kopier `firebaseConfig`-verdiene inn i [js/config.js](js/config.js).
 6. **Authentication → Settings → Authorized domains** → legg til `adrianrutle.github.io`.
+7. For innlogging uten Google: **Authentication → Sign-in method → E-post/passord** → slå på, og slå også på
+   **E-postkobling (passordløs pålogging)**. Da kan man logge inn med en lenke som sendes på e-post.
 
 ### 2. GitHub Pages
 1. Commit og push til `main`.
