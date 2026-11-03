@@ -60,7 +60,8 @@ Appen kjører uavhengig av Claude – alt ligger i GitHub og Firebase under din 
 | Øvrige | Lista «Øvrige» | Se alt, oppdatere kamper (status, tid, bane, resultat) – troppene er skrivebeskyttet |
 
 Listene lagres i dokumentet `config/access` og sjekkes av [firestore.rules](firestore.rules), så begrensningene gjelder også
-om noen prøver å gå rundt appen. Husk å publisere reglene på nytt i Firebase-konsollen når `firestore.rules` endres.
+om noen prøver å gå rundt appen. Reglene publiseres automatisk av GitHub Action «Publiser Firestore-regler» når `firestore.rules` endres
+(se «Automatisk publisering av regler» under). Uten nøkkelen må de limes inn manuelt i Firebase-konsollen.
 
 ## Eksport til Spond
 
@@ -90,3 +91,12 @@ python3 -m http.server 8080
 ## Endre statuser, lag e.l.
 
 Alt slikt ligger i [js/config.js](js/config.js). Endre, commit og push – GitHub Pages oppdaterer seg i løpet av et minutt.
+
+## Automatisk publisering av regler (én gang)
+
+1. Firebase-konsollen → tannhjul → **Prosjektinnstillinger → Tjenestekontoer → Generer ny privat nøkkel**. En JSON-fil lastes ned.
+2. GitHub → repoet → **Settings → Secrets and variables → Actions → New repository secret**.
+   Navn: `FIREBASE_SERVICE_ACCOUNT`, verdi: hele innholdet i JSON-filen. Slett filen fra maskinen etterpå.
+3. GitHub → **Actions → Publiser Firestore-regler → Run workflow** for å publisere med en gang.
+
+Etter dette publiseres reglene hver gang `firestore.rules` endres på `main`.

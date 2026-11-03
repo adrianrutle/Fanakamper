@@ -1,0 +1,29 @@
+# Publiserer firestore.rules til Firebase automatisk når filen endres på main.
+# Krever GitHub-secreten FIREBASE_SERVICE_ACCOUNT (JSON-nøkkel fra Firebase → Prosjektinnstillinger → Tjenestekontoer).
+# Uten secreten hoppes publiseringen over (jobben blir grønn med en merknad).
+name: Publiser Firestore-regler
+
+on:
+  push:
+    branches: [main]
+    paths: [firestore.rules, firebase.json]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+    steps:
+      - name: Mangler nøkkel
+        if: env.HAS_KEY != 'true'
+        run: echo "::notice::Legg inn secreten FIREBASE_SERVICE_ACCOUNT for å publisere reglene automatisk."
+      - uses: actions/checkout@v4
+        if: env.HAS_KEY == 'true'
+      - uses: google-github-actions/auth@v2
+        if: env.HAS_KEY == 'true'
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Publiser regler
+        if: env.HAS_KEY == 'true'
+        run: npx --yes firebase-tools@13 deploy --only firestore:rules --project fanakamper --non-interactive
