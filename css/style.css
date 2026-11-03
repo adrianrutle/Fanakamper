@@ -206,3 +206,8 @@ body[data-role="reader"] .slot, body[data-role="reader"] .chip { cursor: default
 .flt { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .flt .seg button { padding: 6px 10px; }
 .small-note { font-size: 12px; margin: -4px 0 8px; }
+/* Fargevelger per spiller under «Spillere» */
+.colorpick button { padding: 5px 8px; font-size: 12px; }
+.colorpick button:disabled { cursor: default; opacity: .8; }
+.colorpick button.active { background: var(--brand); color: #fff; }
+@media (max-width: 480px) { .colorpick button { padding: 5px 7px; } }

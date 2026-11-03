@@ -786,14 +786,17 @@ $("#playerForm").onsubmit = async (e) => {
 };
 
 function renderPlayers() {
-  const groups = TEAMS.map((t) => {
-    const ps = state.players.filter((p) => p.team === t).sort((a, b) => a.name.localeCompare(b.name, "no"));
+  // Spillere uten gyldig farge får en egen gruppe, så de ikke forsvinner fra lista
+  const groups = [...TEAMS, ""].map((t) => {
+    const ps = state.players.filter((p) => (t ? p.team === t : !TEAMS.includes(p.team)))
+      .sort((a, b) => a.name.localeCompare(b.name, "no"));
     if (!ps.length) return "";
-    return `<div class="card"><h3>${esc(t)} <span class="muted">(${ps.length})</span></h3>
+    return `<div class="card"><h3>${t ? `<span class="pdot team-${esc(t)}"></span>${esc(t)}` : "Uten farge"} <span class="muted">(${ps.length})</span></h3>
       <ul class="players">${ps.map((p) => `<li>
-        <span class="pname">${esc(p.name)}</span>
-        <select class="pteam" data-id="${p.id}" ${canSquad() ? "" : "disabled"}>${TEAMS.map((x) =>
-          `<option ${x === p.team ? "selected" : ""}>${x}</option>`).join("")}</select>
+        <span class="pname">${pdot(p)}${esc(p.name)}</span>
+        <div class="seg colorpick" role="group" aria-label="Farge for ${esc(p.name)}">${TEAMS.map((x) =>
+          `<button type="button" data-id="${p.id}" data-team="${x}" class="${x === p.team ? "active" : ""}"
+            ${canSquad() ? "" : "disabled"} title="Flytt til ${x}" aria-pressed="${x === p.team}"><span class="pdot team-${x}"></span>${x}</button>`).join("")}</div>
         <button class="ghost del eval-only" data-id="${p.id}" title="Fjern">✕</button>
         <div class="ppos">${[0, 1, 2].map((i) => `<select data-id="${p.id}" data-i="${i}" ${canSquad() ? "" : "disabled"}
             aria-label="Posisjon ${i + 1}"><option value="">${i + 1}. posisjon</option>${POSITIONS.map((x) =>
@@ -801,7 +804,11 @@ function renderPlayers() {
         </div></li>`).join("")}</ul></div>`;
   }).join("");
   $("#playerList").innerHTML = groups || `<p class="muted center">Ingen spillere ennå.</p>`;
-  $$("#playerList select.pteam").forEach((s) => (s.onchange = () => store.update("players", s.dataset.id, { team: s.value })));
+  $$("#playerList .colorpick button").forEach((b) => (b.onclick = () => {
+    const p = playerById(b.dataset.id);
+    if (!p || p.team === b.dataset.team) return;
+    store.update("players", p.id, { team: b.dataset.team });
+  }));
   $$("#playerList .ppos select").forEach((s) => (s.onchange = () => {
     // Lagre de tre valgene samlet, uten tomme felt og uten dubletter
     const vals = $$(`#playerList .ppos select[data-id="${s.dataset.id}"]`).map((x) => x.value);

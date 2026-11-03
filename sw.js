@@ -1,5 +1,5 @@
 // Enkel service worker: nettverk først, cache som reserve (gjør appen installerbar og tåler dårlig dekning).
-const CACHE = "fk-v7";
+const CACHE = "fk-v8";
 self.addEventListener("install", (e) => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(
   caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
