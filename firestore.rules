@@ -24,11 +24,16 @@ service cloud.firestore {
       allow read: if isMember();
       allow write: if isOwner();
     }
+    // Felles parametre for automatisk laguttak
+    match /config/assignment {
+      allow read: if isMember();
+      allow write: if isEval();
+    }
     match /matches/{id} {
       allow read: if isMember();
       allow create, delete: if isEval();
       allow update: if isEval() ||
-        (isMember() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["squad", "positions", "formation", "lineup", "slotXY"]));
+        (isMember() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["squad", "positions", "formation", "lineup", "slotXY", "absent"]));
     }
     match /players/{id} {
       allow read: if isMember();

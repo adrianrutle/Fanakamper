@@ -55,7 +55,9 @@
       <div id="resultStats"></div>
       <h3>Kampmatrise</h3>
       <p class="muted">Tallet ved navnet er antall kamper; tallet øverst i hver kolonne er antall i troppen. Bokstaven er posisjonen i kampen (K/F/M/A), svak bokstav = innbytter.
-        <span class="eval-only">Trykk i en rute for å ta spilleren ut til kampen eller fjerne spilleren fra troppen.</span></p>
+        <span class="absent-key">Gul</span> = avslo (A) eller møtte ikke (!); det gule tallet ved navnet er antall avbud.
+        <span class="eval-only">I modus «Ta ut / fjern» tar et trykk spilleren ut eller fjerner spilleren. I modus «Avbud» merker et trykk
+          en uttatt spiller som avslo → møtte ikke → ingen merking.</span></p>
       <div class="toolbar filters">
         <div class="flt"><span class="muted">Kamper</span>
           <div class="seg multi" id="matrixTeam">
@@ -71,6 +73,11 @@
             <button data-team="Rød"><span class="pdot team-Rød"></span>Rød</button>
             <button data-team="Blå"><span class="pdot team-Blå"></span>Blå</button>
           </div></div>
+        <div class="flt eval-only"><span class="muted">Trykk i rute</span>
+          <div class="seg" id="cellMode">
+            <button data-mode="squad" class="active">Ta ut / fjern</button>
+            <button data-mode="absent"><span class="pdot absent-dot"></span>Avbud</button>
+          </div></div>
         <div class="flt"><span class="muted">Sorter</span>
           <div class="seg" id="playerSort">
             <button data-sort="name" class="active">Navn</button>
@@ -78,6 +85,56 @@
           </div></div>
       </div>
       <p class="muted small-note">Trykk på flere farger for å vise flere samtidig. Filter og sortering gjelder begge tabellene under.</p>
+      <details id="autoBox" class="card auto eval-only">
+        <summary><b>⚙️ Automatisk laguttak</b> <span class="muted">– parametre for å fylle troppene</span></summary>
+        <p class="muted">Gjelder kampene som vises i matrisen (filteret «Kamper») i perioden under, og bare spillerne som vises
+          (filteret «Spillere»). Du får et forslag i matrisen først – ingenting lagres før du trykker «Bruk forslaget».
+          Parametrene deles med hele evalueringsgruppen.</p>
+        <div class="auto-grid">
+          <fieldset><legend>Kamper og tropp</legend>
+            <label>Fra <input type="date" id="aFrom"></label>
+            <label>Til <input type="date" id="aTo"></label>
+            <label>Spillere per tropp <input type="number" id="aSize" min="1" max="30" inputmode="numeric"></label>
+            <label>Eksisterende tropper <select id="aMode">
+              <option value="fill">Behold og fyll opp</option>
+              <option value="replace">Lag helt nye</option></select></label>
+          </fieldset>
+          <fieldset><legend>Spilletid</legend>
+            <label>Minst kamper per spiller i perioden <input type="number" id="aMin" min="0" inputmode="numeric"></label>
+            <label>Maks kamper per spiller (0 = ingen grense) <input type="number" id="aMax" min="0" inputmode="numeric"></label>
+            <label class="check"><input type="checkbox" id="aNff"> <span>Følg NFF-regelen: etter seriekamp på et nivå kan man bare hjelpe ett nivå ned</span></label>
+            <label class="check"><input type="checkbox" id="aLineup"> <span>Still også opp startellever på tavlen</span></label>
+            <p class="muted tiny">En spiller tas aldri ut til to kamper samme dag.</p>
+          </fieldset>
+          <fieldset class="wide"><legend>Kamper som skal fylles</legend>
+            <div class="toolbar"><button type="button" id="aSelAll" class="small">Velg alle</button>
+              <button type="button" id="aSelNone" class="small">Ingen</button>
+              <span class="muted tiny">Kampene i perioden som vises i matrisen. Avlyste og spilte kamper er ikke med.</span></div>
+            <div id="aMatches" class="amatches"></div>
+          </fieldset>
+          <fieldset class="wide"><legend>Sammensetning – spillere per farge i hver tropp</legend>
+            <div class="seg" id="aMixMode"><button type="button" data-v="count">Antall</button><button type="button" data-v="pct">Prosent</button></div>
+            <div class="table-wrap"><table class="stats mix" id="aMix"></table></div>
+            <div class="toolbar presets">
+              <span class="muted">Hurtigvalg:</span>
+              <button type="button" data-preset="own">Bare egen farge</button>
+              <button type="button" data-preset="bridge">9 + 3 fra nivået under</button>
+              <button type="button" data-preset="even">Likt fordelt</button>
+            </div>
+          </fieldset>
+          <fieldset class="wide"><legend>Posisjoner – minst i hver tropp</legend>
+            <div class="pos-min" id="aGroupMin"></div>
+            <details><summary class="muted">Detaljerte posisjoner (midtstoppere, backer …)</summary>
+              <div class="pos-min" id="aPosMin"></div></details>
+          </fieldset>
+        </div>
+        <div class="toolbar">
+          <button type="button" id="aRun" class="primary">✨ Lag forslag</button>
+          <button type="button" id="aReset">Standardverdier</button>
+          <span id="aSaved" class="muted"></span>
+        </div>
+      </details>
+      <div id="proposalBar" class="card proposal" hidden></div>
       <div class="table-wrap"><table id="matrix" class="stats matrix"></table></div>
       <h3>Spillere – kamper per nivå</h3>
       <p class="muted">Teller kamper spilleren er tatt ut til (avlyste kamper telles ikke). «Spilt» er kamper med status Spilt.</p>

@@ -1,6 +1,7 @@
 import * as store from "./store.js";
 import { TEAMS, STATUSES, OWNER_EMAIL, POSITIONS, MATCH_POSITIONS, FORMATIONS, DEFAULT_FORMATION } from "./config.js";
 import { APP_VERSION } from "./version.js";
+import { planSquads, defaultParams, quotaFor } from "./autoassign.js";
 import { slots, targets, countGroups, balanceIssues, autoAssign, autoLineup } from "./lineup.js";
 import { parseWorkbook, loadXlsx, FIRST_UNPLANNED } from "./excel-import.js";
 import { spondRows, toIcs } from "./spond.js";
@@ -19,7 +20,7 @@ const outcome = (m) => {
   return d > 0 ? "S" : d < 0 ? "T" : "U";
 };
 
-const state = { user: null, matches: [], players: [], team: "", status: "", showPast: false, matrixTeams: new Set(), playerTeams: new Set(), playerSort: "name", editing: null, role: null, access: null };
+const state = { user: null, matches: [], players: [], team: "", status: "", showPast: false, matrixTeams: new Set(), playerTeams: new Set(), playerSort: "name", proposal: null, autoParams: null, autoSel: null, cellMode: "squad", editing: null, role: null, access: null };
 const canSquad = () => state.role === "owner" || state.role === "eval";
 const SPILT = STATUSES.findIndex((s) => s.id === "spilt");
 const teamRank = (t) => (TEAMS.includes(t) ? TEAMS.indexOf(t) : TEAMS.length);
@@ -56,6 +57,7 @@ async function onUser(user) {
   $("#userBtn").textContent = "Logg ut";
   $("#userBtn").title = user.email;
   await resolveRole();
+  loadAutoParams();
   store.subscribe("matches", (list) => { state.matches = list; renderMatches(); renderStats(); migrateUnplanned(); }, onDbError);
   store.subscribe("players", (list) => {
     state.players = list;
@@ -723,38 +725,81 @@ function renderStats() {
   const players = state.players
     .filter((p) => !state.playerTeams.size || state.playerTeams.has(p.team))
     .sort(state.playerSort === "team" ? byTeamAndName : byName);
-  const count = (p, pred) => active.filter((m) => (m.squad || []).includes(p.id) && pred(m)).length;
+  // Kamper med avbud (gul) telles ikke som kamp
+  const count = (p, pred) => active.filter((m) => (m.squad || []).includes(p.id) && !m.absent?.[p.id] && pred(m)).length;
+  const abs = (p, kind) => active.filter((m) => m.absent?.[p.id] === kind).length;
   $("#playerStats").innerHTML = `<tr><th>Spiller</th><th>Nivå</th><th>Posisjoner</th>
       ${TEAMS.map((t) => `<th><span class="team team-${t}">${t}</span></th>`).join("")}
-      <th>Totalt</th><th>Spilt</th></tr>` +
+      <th>Totalt</th><th>Spilt</th><th title="Avslo invitasjonen">Avslo</th><th title="Møtte ikke opp">Møtte ikke</th></tr>` +
     players.map((p) => {
       const per = TEAMS.map((t) => count(p, (m) => m.team === t));
       const total = per.reduce((a, b) => a + b, 0);
       return `<tr class="${total ? "" : "zero"}"><th>${pdot(p)}${esc(p.name)}</th><td>${esc(p.team)}</td><td title="${esc(posLong(p))}">${esc(posShort(p))}</td>
         ${per.map((n) => `<td>${n || ""}</td>`).join("")}
-        <td><b>${total}</b></td><td>${count(p, (m) => m.status === "spilt") || ""}</td></tr>`;
+        <td><b>${total}</b></td><td>${count(p, (m) => m.status === "spilt") || ""}</td>
+        <td class="${abs(p, "declined") ? "absc" : ""}">${abs(p, "declined") || ""}</td><td class="${abs(p, "noshow") ? "absc" : ""}">${abs(p, "noshow") || ""}</td></tr>`;
     }).join("");
 
   // Matrise: spillere × kamper (innbyttere vises svakere når kampen har oppstilling)
   const isSub = (m, id) => (m.lineup || []).some(Boolean) && !m.lineup.includes(id);
   const cols = active.filter((m) => !state.matrixTeams.size || state.matrixTeams.has(m.team));
+  // Under et forslag vises de foreslåtte troppene; nye uttak og fjernede markeres
+  const prop = (m) => state.proposal?.result[m.id];
+  const sqOf = (m) => prop(m)?.squad ?? m.squad ?? [];
+  const posIn = (m, id) => (prop(m)?.positions ?? m.positions)?.[id];
+  const absentIn = (m, id) => m.absent?.[id];
   // Antall kamper står i den faste navnekolonnen, så det alltid er synlig når tabellen rulles sidelengs.
   // Hver kampkolonne viser dato, lag, bane og antall i troppen.
   $("#matrix").innerHTML = `<tr><th><div class="pcell">Spiller <span class="nbadge head" title="Antall kamper">Kamper</span></div></th>${cols.map((m) =>
-      `<th class="col team-col-${esc(m.team)}" title="${esc(m.team)} ${m.homeAway === "Borte" ? "@" : "vs"} ${esc(m.opponent)}${m.venue ? " · " + esc(m.venue) : ""} · ${(m.squad || []).length} i troppen">
+      `<th class="col team-col-${esc(m.team)}" title="${esc(m.team)} ${m.homeAway === "Borte" ? "@" : "vs"} ${esc(m.opponent)}${m.venue ? " · " + esc(m.venue) : ""} · ${sqOf(m).length} i troppen">
         ${m.date ? m.date.slice(8, 10) + "." + m.date.slice(5, 7) : "?"}<br><small>${esc(m.team[0])}</small>
         <span class="venue">${esc(m.venue || "–")}</span>
-        <span class="cnt${(m.squad || []).length ? "" : " empty"}">${(m.squad || []).length}</span></th>`).join("")}</tr>` +
+        <span class="cnt${sqOf(m).length ? "" : " empty"}${prop(m) ? " prop" : ""}">${sqOf(m).length}</span></th>`).join("")}</tr>` +
     players.map((p) => {
-      const cells = cols.map((m) => (m.squad || []).includes(p.id));
-      const n = cells.filter(Boolean).length;
+      const cells = cols.map((m) => sqOf(m).includes(p.id));
+      // Avbud (gul) teller ikke som kamp
+      const n = cells.filter((on, i) => on && !absentIn(cols[i], p.id)).length;
+      const nAbs = cols.filter((m) => sqOf(m).includes(p.id) && absentIn(m, p.id)).length;
       // Uten spillerfilter: skjul spillere uten kamper som ikke hører til noen av de valgte kampfargene
       if (!n && !state.playerTeams.size && state.matrixTeams.size && !state.matrixTeams.has(p.team)) return "";
-      return `<tr class="${n ? "" : "zero"}"><th><div class="pcell"><span class="pn">${pdot(p)}${esc(p.name)}</span><span class="nbadge${n ? "" : " empty"}">${n}</span></div></th>${cells.map((on, i) =>
-        `<td data-m="${cols[i].id}" data-p="${p.id}" class="${on ? "on team-col-" + esc(cols[i].team) : ""}${on && isSub(cols[i], p.id) ? " sub" : ""}">${on ? esc(cols[i].positions?.[p.id] || "●") : ""}</td>`).join("")}</tr>`;
+      return `<tr class="${n ? "" : "zero"}"><th><div class="pcell"><span class="pn">${pdot(p)}${esc(p.name)}</span><span class="badges">${nAbs ? `<span class="nbadge abs" title="Avbud: avslo eller møtte ikke">${nAbs}</span>` : ""}<span class="nbadge${n ? "" : " empty"}">${n}</span></span></div></th>${cells.map((on, i) =>
+        { const m = cols[i];
+          const added = on && prop(m)?.added.includes(p.id);
+          const gone = !on && prop(m)?.removed.includes(p.id);
+          const abs = on && absentIn(m, p.id);
+          return `<td data-m="${m.id}" data-p="${p.id}" class="${on ? "on team-col-" + esc(m.team) : ""}${on && isSub(m, p.id) ? " sub" : ""}${added ? " new" : ""}${gone ? " gone" : ""}${abs ? " absent" : ""}"
+            ${abs ? `title="${abs === "noshow" ? "Møtte ikke" : "Avslo"}"` : added ? 'title="Nytt i forslaget"' : gone ? 'title="Fjernes i forslaget"' : ""}>${abs ? (abs === "noshow" ? "!" : "A") : on ? esc(posIn(m, p.id) || "●") : gone ? "×" : ""}</td>`; }).join("")}</tr>`;
     }).join("");
+  renderAutoMatches();
   $("#matrix").classList.toggle("editable", canSquad());
-  if (canSquad()) $$("#matrix td[data-m]").forEach((td) => (td.onclick = () => toggleInSquad(td.dataset.m, td.dataset.p)));
+  $("#matrix").classList.toggle("mode-absent", state.cellMode === "absent");
+  if (canSquad()) $$("#matrix td[data-m]").forEach((td) => (td.onclick = () =>
+    state.cellMode === "absent" ? cycleAbsent(td.dataset.m, td.dataset.p) : toggleInSquad(td.dataset.m, td.dataset.p)));
+}
+
+// Gul markering i ettertid: uttatt spiller som avslo eller ikke møtte. Trykk: avslo → møtte ikke → ingen.
+$$("#cellMode button").forEach((b) => (b.onclick = () => {
+  state.cellMode = b.dataset.mode;
+  $$("#cellMode button").forEach((x) => x.classList.toggle("active", x === b));
+  renderStats();
+}));
+async function cycleAbsent(matchId, playerId) {
+  const m = state.matches.find((x) => x.id === matchId);
+  const p = playerById(playerId);
+  if (!m || !p) return;
+  if (!(m.squad || []).includes(playerId)) return alert(`${p.name} er ikke tatt ut til denne kampen. Avbud kan bare merkes på uttatte spillere.`);
+  const cur = m.absent?.[playerId] || "";
+  const next = cur === "" ? "declined" : cur === "declined" ? "noshow" : "";
+  const absent = { ...(m.absent || {}) };
+  if (next) absent[playerId] = next; else delete absent[playerId];
+  const label = { declined: "avslo", noshow: "møtte ikke", "": "avbud fjernet" }[next];
+  // Hele kartet skrives på nytt (merge ville beholdt fjernede nøkler)
+  await store.update("matches", matchId, {
+    absent: Object.keys(absent).length ? absent : {},
+    updatedAt: new Date().toISOString(),
+    log: [...(m.log || []), logEntry(`Avbud: ${p.name} ${label}`)]
+  });
+  if (!next && store.removeField) await store.removeField("matches", matchId, ["absent", playerId]);
 }
 
 // Evalueringsgruppen kan ta ut / fjerne spillere direkte i kampmatrisen
@@ -762,6 +807,18 @@ async function toggleInSquad(matchId, playerId) {
   const m = state.matches.find((x) => x.id === matchId);
   const p = playerById(playerId);
   if (!m || !p) return;
+  // Under et forslag endres forslaget, ikke databasen
+  const e = state.proposal?.result[matchId];
+  if (e) {
+    const before = new Set(m.squad || []);
+    if (e.squad.includes(playerId)) e.squad = e.squad.filter((id) => id !== playerId);
+    else { e.squad.push(playerId); e.positions[playerId] ||= defaultMatchPos(p); }
+    e.added = e.squad.filter((id) => !before.has(id));
+    e.removed = [...before].filter((id) => !e.squad.includes(id));
+    if (e.lineup) e.lineup = e.lineup.map((id) => (e.squad.includes(id) ? id : ""));
+    renderStats(); renderProposal();
+    return;
+  }
   const squad = m.squad || [];
   const inSquad = squad.includes(playerId);
   const data = { updatedAt: new Date().toISOString() };
@@ -776,6 +833,192 @@ async function toggleInSquad(matchId, playerId) {
     data.log = [...(m.log || []), logEntry(`Tropp: + ${p.name}`)];
   }
   await store.update("matches", matchId, data);
+}
+
+// ---------- Automatisk laguttak ----------
+const AUTO_KEY = "fk_autoparams";
+function withDefaults(p) {
+  const d = defaultParams(today());
+  const out = { ...d, ...(p || {}) };
+  out.mix = { ...d.mix };
+  for (const t of TEAMS) out.mix[t] = { ...d.mix[t], ...(p?.mix?.[t] || {}) };
+  out.groupMin = { ...d.groupMin, ...(p?.groupMin || {}) };
+  out.posMin = { ...(p?.posMin || d.posMin) };
+  // En lagret periode som er passert, flyttes fram til i dag
+  if (out.to < today()) { out.from = d.from; out.to = d.to; }
+  return out;
+}
+
+async function loadAutoParams() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(AUTO_KEY) || "null"); } catch (e) { /* ignorer */ }
+  state.autoParams = withDefaults(saved);
+  renderAutoPanel();
+  if (!canSquad()) return;
+  try {
+    const shared = await store.get("config", "assignment");
+    if (shared?.params) { state.autoParams = withDefaults(shared.params); renderAutoPanel(); }
+  } catch (e) { /* reglene er ikke publisert ennå – bruk lokale verdier */ }
+}
+
+let saveTimer = null;
+function saveAutoParams() {
+  try { localStorage.setItem(AUTO_KEY, JSON.stringify(state.autoParams)); } catch (e) { /* ignorer */ }
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      await store.add("config", { params: state.autoParams, by: state.user?.email || "", at: new Date().toISOString() }, "assignment");
+      $("#aSaved").textContent = "Lagret for hele evalueringsgruppen ✓";
+    } catch (e) {
+      $("#aSaved").textContent = "Lagret i denne nettleseren (publiser nye Firebase-regler for å dele)";
+    }
+  }, 800);
+}
+
+const numIn = (id, v, cls = "") => `<input type="number" min="0" inputmode="numeric" class="${cls}" data-k="${id}" value="${esc(v ?? 0)}">`;
+
+function renderAutoPanel() {
+  const P = state.autoParams;
+  if (!P || !$("#autoBox")) return;
+  renderAutoMatches();
+  $("#aFrom").value = P.from; $("#aTo").value = P.to; $("#aSize").value = P.size; $("#aMode").value = P.mode;
+  $("#aMin").value = P.minGames; $("#aMax").value = P.maxGames;
+  $("#aNff").checked = !!P.nff; $("#aLineup").checked = !!P.lineup;
+  $$("#aMixMode button").forEach((b) => b.classList.toggle("active", b.dataset.v === P.mixMode));
+  const unit = P.mixMode === "pct" ? "%" : "";
+  $("#aMix").innerHTML = `<tr><th>Kamp ↓ / spillere →</th>${TEAMS.map((t) => `<th title="${t}-spillere">${pdot({ team: t })}${t}</th>`).join("")}<th>Sum</th></tr>` +
+    TEAMS.map((mt) => {
+      const sum = TEAMS.reduce((a, t) => a + (Number(P.mix[mt][t]) || 0), 0);
+      const q = quotaFor(P, mt, Number(P.size) || 12);
+      const qsum = TEAMS.reduce((a, t) => a + q[t], 0);
+      const hint = P.mixMode === "pct" ? `${sum}% ≈ ${TEAMS.map((t) => q[t]).join("+")}` : `${sum}`;
+      const warn = P.mixMode === "pct" ? sum !== 100 : qsum !== Number(P.size);
+      return `<tr><th><span class="team team-${mt}">${mt}</span></th>${TEAMS.map((t) =>
+        `<td>${numIn(mt + "|" + t, P.mix[mt][t], "mixin")}${unit}</td>`).join("")}
+        <td class="${warn ? "warnc" : ""}" title="${warn ? "Summen er ikke lik troppen – resten fylles med nærmeste nivå" : ""}">${hint}</td></tr>`;
+    }).join("");
+  $("#aGroupMin").innerHTML = MATCH_POSITIONS.map((x) => `<label>${x.label} ${numIn(x.id, P.groupMin[x.id], "gmin")}</label>`).join("");
+  $("#aPosMin").innerHTML = POSITIONS.filter((x) => x.id !== "K").map((x) =>
+    `<label>${x.label} ${numIn(x.id, P.posMin[x.id] || 0, "pmin")}</label>`).join("");
+  $$("#aMix input").forEach((i) => (i.onchange = () => {
+    const [mt, t] = i.dataset.k.split("|");
+    P.mix[mt][t] = Math.max(0, Number(i.value) || 0); saveAutoParams(); renderAutoPanel();
+  }));
+  $$("#aGroupMin input").forEach((i) => (i.onchange = () => { P.groupMin[i.dataset.k] = Math.max(0, Number(i.value) || 0); saveAutoParams(); }));
+  $$("#aPosMin input").forEach((i) => (i.onchange = () => {
+    const v = Math.max(0, Number(i.value) || 0);
+    if (v) P.posMin[i.dataset.k] = v; else delete P.posMin[i.dataset.k];
+    saveAutoParams();
+  }));
+}
+
+for (const [id, key, conv] of [["#aFrom", "from", String], ["#aTo", "to", String], ["#aSize", "size", Number],
+  ["#aMode", "mode", String], ["#aMin", "minGames", Number], ["#aMax", "maxGames", Number]]) {
+  $(id).onchange = () => { state.autoParams[key] = conv($(id).value); saveAutoParams(); if (key === "size") renderAutoPanel(); };
+}
+$("#aNff").onchange = () => { state.autoParams.nff = $("#aNff").checked; saveAutoParams(); };
+$("#aLineup").onchange = () => { state.autoParams.lineup = $("#aLineup").checked; saveAutoParams(); };
+$$("#aMixMode button").forEach((b) => (b.onclick = () => {
+  const P = state.autoParams;
+  if (P.mixMode === b.dataset.v) return;
+  // Gjør om mellom antall og prosent så fordelingen beholdes
+  const n = Number(P.size) || 12;
+  for (const mt of TEAMS) for (const t of TEAMS) {
+    const v = Number(P.mix[mt][t]) || 0;
+    P.mix[mt][t] = b.dataset.v === "pct" ? Math.round((v / n) * 100) : Math.round((v * n) / 100);
+  }
+  P.mixMode = b.dataset.v; saveAutoParams(); renderAutoPanel();
+}));
+$$("#autoBox [data-preset]").forEach((b) => (b.onclick = () => {
+  const P = state.autoParams;
+  const n = Number(P.size) || 12;
+  const pct = P.mixMode === "pct";
+  const val = (x) => (pct ? Math.round((x / n) * 100) : x);
+  TEAMS.forEach((mt, i) => TEAMS.forEach((t, j) => {
+    let v = 0;
+    if (b.dataset.preset === "own") v = i === j ? n : 0;
+    if (b.dataset.preset === "bridge") {
+      const below = i < TEAMS.length - 1 ? i + 1 : i - 1; // nederste nivå låner fra nivået over
+      v = j === i ? n - 3 : j === below ? 3 : 0;
+    }
+    if (b.dataset.preset === "even") v = Math.floor(n / TEAMS.length) + (j < n % TEAMS.length ? 1 : 0);
+    P.mix[mt][t] = pct && b.dataset.preset === "even" ? Math.round(100 / TEAMS.length) + (j === 0 ? 100 - Math.round(100 / TEAMS.length) * TEAMS.length : 0) : val(v);
+  }));
+  saveAutoParams(); renderAutoPanel();
+}));
+$("#aReset").onclick = () => { state.autoParams = withDefaults(null); saveAutoParams(); renderAutoPanel(); };
+
+// Kampene som kan fylles: i perioden, synlige i matrisen, ikke avlyst/spilt
+function autoCandidates() {
+  const P = state.autoParams;
+  return state.matches.filter((m) => m.status !== "avlyst" && m.status !== "spilt" && m.date &&
+    m.date >= P.from && m.date <= P.to && (!state.matrixTeams.size || state.matrixTeams.has(m.team)))
+    .sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+}
+// state.autoSel = null betyr alle; ellers et sett med valgte kamp-id-er
+const autoChosen = (m) => !state.autoSel || state.autoSel.has(m.id);
+function renderAutoMatches() {
+  if (!$("#aMatches") || !state.autoParams) return;
+  const list = autoCandidates();
+  $("#aMatches").innerHTML = list.length ? list.map((m) => `<label class="amatch">
+      <input type="checkbox" value="${m.id}" ${autoChosen(m) ? "checked" : ""}>
+      <span class="team team-${esc(m.team)}">${esc(m.team)}</span> ${dayLabel(m.date)}
+      <span class="muted">${m.homeAway === "Borte" ? "@" : "vs"} ${esc(m.opponent || "?")} · ${(m.squad || []).length} i tropp</span></label>`).join("")
+    : `<p class="muted tiny">Ingen kamper i perioden med valgt filter.</p>`;
+  $$("#aMatches input").forEach((i) => (i.onchange = () => {
+    if (!state.autoSel) state.autoSel = new Set(list.map((m) => m.id));
+    i.checked ? state.autoSel.add(i.value) : state.autoSel.delete(i.value);
+  }));
+}
+$("#aSelAll").onclick = () => { state.autoSel = null; renderAutoMatches(); };
+$("#aSelNone").onclick = () => { state.autoSel = new Set(); renderAutoMatches(); };
+
+$("#aRun").onclick = () => {
+  const P = state.autoParams;
+  if (P.from > P.to) return alert("«Fra» må være før «Til».");
+  const matches = autoCandidates().filter(autoChosen);
+  if (!matches.length) return alert("Ingen kamper valgt. Kryss av kampene som skal fylles.");
+  const players = state.players.filter((p) => !state.playerTeams.size || state.playerTeams.has(p.team));
+  state.proposal = { ...planSquads({ matches, allMatches: state.matches, players, params: P }), n: matches.length };
+  renderStats(); renderProposal();
+  $("#proposalBar").scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+function renderProposal() {
+  const bar = $("#proposalBar");
+  const pr = state.proposal;
+  bar.hidden = !pr;
+  if (!pr) return;
+  const entries = Object.entries(pr.result).map(([id, e]) => [state.matches.find((m) => m.id === id), e]).filter(([m]) => m);
+  const add = entries.reduce((a, [, e]) => a + e.added.length, 0);
+  const rem = entries.reduce((a, [, e]) => a + e.removed.length, 0);
+  const warn = entries.filter(([, e]) => e.warnings.length);
+  const name = (id) => playerById(id)?.name || id;
+  bar.innerHTML = `<div class="prop-head"><b>Forslag – ikke lagret ennå</b>
+      <span>${pr.n} kamper · <span class="addc">+${add} uttak</span>${rem ? ` · <span class="remc">−${rem} fjernet</span>` : ""}</span></div>
+    <p class="muted tiny">Grønn ramme = nytt i forslaget, × = fjernes. Trykk i ruter for å justere forslaget før du bruker det.</p>
+    ${warn.length ? `<ul class="issues">${warn.map(([m, e]) => `<li>⚠ ${dayLabel(m.date)} <span class="team team-${esc(m.team)}">${esc(m.team)}</span>
+      ${esc(m.opponent || "")}: ${e.warnings.map(esc).join(", ")}</li>`).join("")}</ul>` : `<p class="ok">✓ Alle kravene er oppfylt</p>`}
+    ${pr.under.length ? `<p class="issues">⚠ Under minimum (${state.autoParams.minGames} kamper): ${pr.under.map((p) => esc(p.name) + " (" + pr.count[p.id] + ")").join(", ")}</p>` : ""}
+    <div class="toolbar"><button type="button" id="aApply" class="primary">✓ Bruk forslaget</button>
+      <button type="button" id="aDiscard">Forkast</button></div>`;
+  $("#aDiscard").onclick = () => { state.proposal = null; renderStats(); renderProposal(); };
+  $("#aApply").onclick = async () => {
+    const btn = $("#aApply");
+    btn.disabled = true; btn.textContent = "Lagrer…";
+    for (const [m, e] of entries) {
+      if (!e.added.length && !e.removed.length && !e.lineup) continue;
+      const data = {
+        squad: e.squad, positions: e.positions, updatedAt: new Date().toISOString(),
+        lineup: e.lineup || (m.lineup || []).map((id) => (e.squad.includes(id) ? id : "")),
+        log: [...(m.log || []), logEntry(`Automatisk laguttak: ${[e.added.length ? "+" + e.added.map(name).join(", ") : "",
+          e.removed.length ? "−" + e.removed.map(name).join(", ") : ""].filter(Boolean).join(" · ") || "oppstilling"}`)]
+      };
+      if (e.formation) data.formation = e.formation;
+      await store.update("matches", m.id, data);
+    }
+    state.proposal = null; renderStats(); renderProposal();
+  };
 }
 
 // ---------- Spillere ----------

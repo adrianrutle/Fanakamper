@@ -211,3 +211,47 @@ body[data-role="reader"] .slot, body[data-role="reader"] .chip { cursor: default
 .colorpick button:disabled { cursor: default; opacity: .8; }
 .colorpick button.active { background: var(--brand); color: #fff; }
 @media (max-width: 480px) { .colorpick button { padding: 5px 7px; } }
+
+/* Automatisk laguttak */
+.auto summary { cursor: pointer; padding: 2px 0; }
+.auto-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.auto-grid .wide { grid-column: 1 / -1; }
+@media (max-width: 640px) { .auto-grid { grid-template-columns: 1fr; } }
+.auto fieldset { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.auto fieldset > label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
+.auto fieldset > label.check { flex-direction: row; gap: 6px; align-items: flex-start; color: var(--text); }
+.auto .check input { width: auto; margin-top: 2px; }
+.auto .seg { align-self: flex-start; }
+.auto table.mix td, .auto table.mix th { padding: 4px; }
+.auto table.mix input { width: 56px; padding: 4px 6px; text-align: center; }
+.auto .warnc { color: #b45309; font-weight: 600; }
+.auto .presets button { padding: 4px 8px; font-size: 12px; }
+.pos-min { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+.pos-min label { display: flex; align-items: center; justify-content: space-between; gap: 6px; color: var(--text); }
+.pos-min input { width: 56px; padding: 4px 6px; text-align: center; }
+.tiny { font-size: 12px; margin: 2px 0; }
+.proposal { border: 2px solid #16a34a; }
+.prop-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; }
+.addc { color: #15803d; font-weight: 600; } .remc { color: #dc2626; font-weight: 600; }
+.matrix td.new { box-shadow: inset 0 0 0 2px #16a34a; }
+.matrix td.gone { color: #dc2626; font-weight: 700; }
+.matrix th.col .cnt.prop { background: #16a34a; }
+/* Avbud (gul) */
+.matrix td.absent { background: #fde047 !important; color: #713f12 !important; font-weight: 700; opacity: 1; }
+.matrix.mode-absent td[data-m].on { cursor: pointer; }
+.matrix.mode-absent td[data-m]:not(.on) { cursor: not-allowed; }
+.matrix .badges { display: inline-flex; gap: 3px; }
+.matrix .nbadge.abs { background: #facc15; color: #713f12; }
+.pdot.absent-dot { background: #facc15; border-color: #ca8a04; }
+.absent-key { background: #fde047; color: #713f12; padding: 0 4px; border-radius: 3px; font-weight: 600; }
+.stats td.absc { background: #fef9c3; color: #713f12; font-weight: 700; }
+.amatches { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.amatch { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text) !important; flex-direction: row !important; }
+.amatch input { width: auto; }
+.auto .small { padding: 4px 8px; font-size: 12px; }
+.auto fieldset { min-width: 0; margin: 8px 0; }
+.auto input[type=date], .auto input[type=number], .auto select { width: 100%; max-width: 220px; }
+.auto table.mix input { width: 52px; }
+.auto .check { overflow-wrap: anywhere; }
+.auto .amatch { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.auto .check span { flex: 1; min-width: 0; white-space: normal; }

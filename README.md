@@ -18,6 +18,10 @@ Appen kjører uavhengig av Claude – alt ligger i GitHub og Firebase under din 
   en kampposisjon – Keeper, Forsvar, Midtbane eller Angrep – foreslått ut fra førstevalget. Listene ligger i `js/config.js`.
 - Fordelingssjekk for 9er: troppen sammenlignes med formasjonen (én keeper, resten fordelt som forsvar-midtbane-angrep),
   med advarsel ved skjev fordeling og knappen «Fordel posisjoner» som fordeler ut fra spillernes ønsker
+- Automatisk laguttak (under Laguttak): velg kamper og periode, troppsstørrelse, fargefordeling (antall eller prosent),
+  minimum per posisjon (også detaljert, f.eks. midtstoppere), min/maks kamper per spiller og NFF-regelen for flytting nedover.
+  Forslaget vises i kampmatrisen og kan justeres før det brukes. Parametrene deles i `config/assignment`.
+- Avbud: merk i ettertid med gult i kampmatrisen at en uttatt spiller avslo eller ikke møtte. Telles per spiller.
 - Taktikktavle per kamp: velg formasjon (3-3-2, 3-2-3, 3-4-1, 2-4-2, 4-3-1, 2-3-3), still opp spillerne på banen og
   ha resten som innbyttere. «Still opp automatisk» fyller banen ut fra posisjoner, ønsker og hvem som har startet færrest kamper
 - Historikk per kamp (hvem endret hva og når)

@@ -96,6 +96,12 @@ export async function update(coll, id, data) {
   await fb.setDoc(fb.doc(db, coll, id), data, { merge: true });
 }
 
+// Fjerner ett felt i et kart, f.eks. ["absent", spillerId] – setDoc med merge kan ikke slette nøkler i et kart
+export async function removeField(coll, id, path) {
+  if (demoMode) return; // demo: update() har allerede skrevet hele kartet
+  await fb.updateDoc(fb.doc(db, coll, id), new fb.FieldPath(...path), fb.deleteField());
+}
+
 export async function remove(coll, id) {
   if (demoMode) {
     const all = loadLocal(coll);
