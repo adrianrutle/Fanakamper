@@ -260,3 +260,6 @@ body[data-role="reader"] .slot, body[data-role="reader"] .chip { cursor: default
 .or::before, .or::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
 .email-login { display: flex; flex-direction: column; gap: 8px; max-width: 360px; margin: 0 auto; }
 #loginInfo { max-width: 360px; margin: 10px auto; }
+.matrix th.col .cnts { display: inline-flex; gap: 2px; margin-top: 3px; }
+.matrix th.col .cnts .cnt { margin-top: 0; }
+.matrix th.col .cnt.abs { background: #facc15; color: #713f12; }

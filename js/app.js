@@ -769,13 +769,16 @@ function renderStats() {
   const sqOf = (m) => prop(m)?.squad ?? m.squad ?? [];
   const posIn = (m, id) => (prop(m)?.positions ?? m.positions)?.[id];
   const absentIn = (m, id) => m.absent?.[id];
+  // Per kamp: avbud (gult) og resten av troppen
+  const nAbsM = (m) => sqOf(m).filter((id) => absentIn(m, id)).length;
+  const nPlay = (m) => sqOf(m).length - nAbsM(m);
   // Antall kamper står i den faste navnekolonnen, så det alltid er synlig når tabellen rulles sidelengs.
   // Hver kampkolonne viser dato, lag, bane og antall i troppen.
   $("#matrix").innerHTML = `<tr><th><div class="pcell">Spiller <span class="nbadge head" title="Antall kamper">Kamper</span></div></th>${cols.map((m) =>
-      `<th class="col team-col-${esc(m.team)}" title="${esc(m.team)} ${m.homeAway === "Borte" ? "@" : "vs"} ${esc(m.opponent)}${m.venue ? " · " + esc(m.venue) : ""} · ${sqOf(m).length} i troppen">
+      `<th class="col team-col-${esc(m.team)}" title="${esc(m.team)} ${m.homeAway === "Borte" ? "@" : "vs"} ${esc(m.opponent)}${m.venue ? " · " + esc(m.venue) : ""} · ${nPlay(m)} uttatt${nAbsM(m) ? ` · ${nAbsM(m)} avbud` : ""}">
         ${m.date ? m.date.slice(8, 10) + "." + m.date.slice(5, 7) : "?"}<br><small>${esc(m.team[0])}</small>
         <span class="venue">${esc(m.venue || "–")}</span>
-        <span class="cnt${sqOf(m).length ? "" : " empty"}${prop(m) ? " prop" : ""}">${sqOf(m).length}</span></th>`).join("")}</tr>` +
+        <span class="cnts">${nAbsM(m) ? `<span class="cnt abs" title="Avbud: avslo eller møtte ikke">${nAbsM(m)}</span>` : ""}<span class="cnt${nPlay(m) ? "" : " empty"}${prop(m) ? " prop" : ""}" title="Uttatt uten avbud">${nPlay(m)}</span></span></th>`).join("")}</tr>` +
     players.map((p) => {
       const cells = cols.map((m) => sqOf(m).includes(p.id));
       // Avbud (gul) teller ikke som kamp
