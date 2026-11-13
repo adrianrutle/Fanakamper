@@ -263,3 +263,11 @@ body[data-role="reader"] .slot, body[data-role="reader"] .chip { cursor: default
 .matrix th.col .cnts { display: inline-flex; gap: 2px; margin-top: 3px; }
 .matrix th.col .cnts .cnt { margin-top: 0; }
 .matrix th.col .cnt.abs { background: #facc15; color: #713f12; }
+/* Avbud i Kamper-visningen */
+.absbadge { display: inline-block; background: #facc15; color: #713f12; font-weight: 700; font-size: 12px; padding: 0 6px; border-radius: 10px; }
+.squad .absbtn { display: none; padding: 2px 6px; font-size: 11px; border-radius: 10px; border: 1px solid var(--line); background: #fff; white-space: nowrap; }
+.squad .pick.on .absbtn { display: inline-block; }
+.squad .pick.absent { background: #fde047 !important; }
+.squad .pick.absent .pname { text-decoration: line-through; color: #713f12; }
+.squad .pick.absent .absbtn { background: #facc15; border-color: #ca8a04; color: #713f12; font-weight: 700; }
+.squad .pick.absent .mpos { visibility: hidden; }
