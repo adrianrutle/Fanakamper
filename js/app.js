@@ -62,7 +62,6 @@ async function onUser(user) {
   store.subscribe("players", (list) => {
     state.players = list;
     migrateBegge();
-    cleanupPlayers();
     renderPlayers();
     renderStats();
     if (dlg.open && !$$("#squadPicker input").length) {
@@ -103,30 +102,6 @@ async function migrateBegge() {
   try {
     for (const p of todo) await store.update("players", p.id, { team: "Blå" });
   } finally { movingBegge = false; }
-}
-
-// Engangsrydding (2. nov. 2026): slett Stas og Emilian, og gi Youssef posisjonen Keeper.
-// Eieren får spørsmål før noe endres. Kan fjernes når det er gjort.
-let cleaning = false;
-async function cleanupPlayers() {
-  if (state.role !== "owner" || cleaning || localStorage.getItem("fk_cleanup_2026_11_02")) return;
-  const byFirst = (n) => state.players.filter((p) => p.name.trim().split(/\s+/)[0].toLowerCase() === n);
-  const del = ["stas", "emilian"].flatMap((n) => { const m = byFirst(n); return m.length === 1 ? m : []; });
-  const yo = byFirst("youssef");
-  const keeper = yo.length === 1 && !(yo[0].positions || []).includes("K") ? yo[0] : null;
-  if (!del.length && !keeper) return;
-  cleaning = true;
-  const what = [...del.map((p) => `• Slette ${p.name}`), ...(keeper ? [`• Gi ${keeper.name} posisjonen Keeper (K)`] : [])];
-  try {
-    if (confirm(`Rydding av spillerlisten:\n${what.join("\n")}\n\nGjøre dette nå?`)) {
-      for (const p of del) await store.remove("players", p.id);
-      if (keeper) {
-        const pos = keeper.positions || [];
-        await store.update("players", keeper.id, { positions: pos.length < 3 ? [...pos, "K"] : [...pos.slice(0, 2), "K"] });
-      }
-    }
-    localStorage.setItem("fk_cleanup_2026_11_02", "1");
-  } finally { cleaning = false; }
 }
 
 // Rollen avgjøres av listene i config/access. Reglene i firestore.rules håndhever det samme på serveren.
