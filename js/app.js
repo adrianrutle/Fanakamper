@@ -1,6 +1,7 @@
 import * as store from "./store.js";
 import { TEAMS, STATUSES, OWNER_EMAIL, POSITIONS, MATCH_POSITIONS, FORMATIONS, DEFAULT_FORMATION } from "./config.js";
 import { APP_VERSION } from "./version.js";
+import { startChat, onChatShown } from "./chat.js";
 import { planSquads, defaultParams, quotaFor } from "./autoassign.js";
 import { slots, targets, countGroups, balanceIssues, autoAssign, autoLineup } from "./lineup.js";
 import { parseWorkbook, loadXlsx, FIRST_UNPLANNED } from "./excel-import.js";
@@ -58,6 +59,7 @@ async function onUser(user) {
   $("#userBtn").title = user.email;
   await resolveRole();
   loadAutoParams();
+  if (state.role && state.role !== "none") startChat({ user, isEval: canSquad(), isOwner: state.role === "owner" });
   store.subscribe("matches", (list) => { state.matches = list; renderMatches(); renderStats(); migrateUnplanned(); }, onDbError);
   store.subscribe("players", (list) => {
     state.players = list;
@@ -166,6 +168,7 @@ function showView(v) {
   $$(".view").forEach((s) => (s.hidden = s.id !== v));
   $$("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === v));
   if (v === "settings") loadAccess();
+  if (v === "chat") onChatShown();
 }
 
 // ---------- Kampliste ----------

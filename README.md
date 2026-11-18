@@ -21,6 +21,9 @@ Appen kjører uavhengig av Claude – alt ligger i GitHub og Firebase under din 
 - Automatisk laguttak (under Laguttak): velg kamper og periode, troppsstørrelse, fargefordeling (antall eller prosent),
   minimum per posisjon (også detaljert, f.eks. midtstoppere), min/maks kamper per spiller og NFF-regelen for flytting nedover.
   Forslaget vises i kampmatrisen og kan justeres før det brukes. Parametrene deles i `config/assignment`.
+- Chat (egen meny): gruppen «Alle» for alle med tilgang og «Evalueringsgruppen» bare for evalueringsgruppen.
+  Søk i meldingene, send bilder (📷, dra og slipp, eller lim inn med Ctrl+V). Bilder komprimeres og lagres i
+  Firestore (`chat_img_*`), så Firebase Storage trengs ikke. Uleste meldinger vises som et tall på fanen.
 - Avbud: merk i ettertid med gult i kampmatrisen at en uttatt spiller avslo eller ikke møtte. Telles per spiller.
 - Taktikktavle per kamp: velg formasjon (3-3-2, 3-2-3, 3-4-1, 2-4-2, 4-3-1, 2-3-3), still opp spillerne på banen og
   ha resten som innbyttere. «Still opp automatisk» fyller banen ut fra posisjoner, ønsker og hvem som har startet færrest kamper

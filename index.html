@@ -17,7 +17,8 @@
       <button data-view="matches" class="active">Kamper</button>
       <button data-view="stats">Laguttak</button>
       <button data-view="players">Spillere</button>
-      <button data-view="settings">Innstillinger</button>
+      <button data-view="chat">Chat <span id="chatBadge" class="badge" hidden></span></button>
+      <button data-view="settings" title="Innstillinger"><span class="tab-ico">⚙️</span><span class="tab-lbl">Innstillinger</span></button>
     </nav>
     <button id="userBtn" class="ghost" hidden></button>
   </header>
@@ -154,6 +155,26 @@
         <button class="primary">Legg til</button>
       </form>
       <div id="playerList"></div>
+    </section>
+
+    <section id="chat" class="view" hidden>
+      <div class="chat-top">
+        <div class="seg" id="chatChannel">
+          <button data-ch="alle" class="active">Alle <span class="unread" hidden></span></button>
+          <button data-ch="eval" hidden>Evalueringsgruppen <span class="unread" hidden></span></button>
+        </div>
+        <div class="chat-search"><input type="search" id="chatSearch" placeholder="Søk i chatten …" aria-label="Søk i chatten">
+          <span id="chatHits" class="muted"></span></div>
+      </div>
+      <div id="chatLog" class="chat-log" aria-live="polite"></div>
+      <div id="chatPreview" class="chat-preview" hidden></div>
+      <form id="chatForm" class="chat-form">
+        <button type="button" id="chatAttach" class="ghost" title="Legg ved bilde" aria-label="Legg ved bilde">📷</button>
+        <input type="file" id="chatFile" accept="image/*" hidden>
+        <textarea id="chatText" rows="1" placeholder="Skriv en melding …" title="Enter sender, Shift+Enter gir ny linje. Lim inn bilde med Ctrl+V." aria-label="Melding"></textarea>
+        <button id="chatSend" class="primary">Send</button>
+      </form>
+      <div id="chatLightbox" class="lightbox" hidden></div>
     </section>
 
     <section id="settings" class="view" hidden>

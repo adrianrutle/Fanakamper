@@ -39,5 +39,27 @@ service cloud.firestore {
       allow read: if isMember();
       allow write: if isEval();
     }
+    // Chat: «Alle» for alle med tilgang, «Evalueringsgruppen» bare for evalueringsgruppen.
+    // Man kan bare skrive i eget navn, og bare slette egne meldinger (eier kan slette alle).
+    match /chat_alle/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && request.resource.data.by == email();
+      allow delete: if isOwner() || (isMember() && resource.data.by == email());
+    }
+    match /chat_img_alle/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && request.resource.data.by == email();
+      allow delete: if isOwner() || (isMember() && resource.data.by == email());
+    }
+    match /chat_eval/{id} {
+      allow read: if isEval();
+      allow create: if isEval() && request.resource.data.by == email();
+      allow delete: if isOwner() || (isEval() && resource.data.by == email());
+    }
+    match /chat_img_eval/{id} {
+      allow read: if isEval();
+      allow create: if isEval() && request.resource.data.by == email();
+      allow delete: if isOwner() || (isEval() && resource.data.by == email());
+    }
   }
 }
