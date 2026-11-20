@@ -754,17 +754,19 @@ function renderStats() {
     .sort(state.playerSort === "team" ? byTeamAndName : byName);
   // Kamper med avbud (gul) telles ikke som kamp
   const count = (p, pred) => active.filter((m) => (m.squad || []).includes(p.id) && !m.absent?.[p.id] && pred(m)).length;
-  const abs = (p, kind) => active.filter((m) => m.absent?.[p.id] === kind).length;
+  const abs = (p, kind) => active.filter((m) => (m.squad || []).includes(p.id) && m.absent?.[p.id] === kind).length;
   $("#playerStats").innerHTML = `<tr><th>Spiller</th><th>Nivå</th><th>Posisjoner</th>
       ${TEAMS.map((t) => `<th><span class="team team-${t}">${t}</span></th>`).join("")}
-      <th>Totalt</th><th>Spilt</th><th title="Avslo invitasjonen">Avslo</th><th title="Møtte ikke opp">Møtte ikke</th></tr>` +
+      <th title="Alle kamper spilleren er invitert til: ja + avbud">Totalt</th><th title="Kamper spilleren er tatt ut til og ikke har meldt avbud">Ja</th><th>Spilt</th><th title="Avslo invitasjonen">Avslo</th><th title="Møtte ikke opp">Møtte ikke</th></tr>` +
     players.map((p) => {
       const per = TEAMS.map((t) => count(p, (m) => m.team === t));
-      const total = per.reduce((a, b) => a + b, 0);
-      return `<tr class="${total ? "" : "zero"}"><th>${pdot(p)}${esc(p.name)}</th><td>${esc(p.team)}</td><td title="${esc(posLong(p))}">${esc(posShort(p))}</td>
+      const yes = per.reduce((a, b) => a + b, 0);
+      const declined = abs(p, "declined"), noshow = abs(p, "noshow");
+      const invited = yes + declined + noshow;
+      return `<tr class="${invited ? "" : "zero"}"><th>${pdot(p)}${esc(p.name)}</th><td>${esc(p.team)}</td><td title="${esc(posLong(p))}">${esc(posShort(p))}</td>
         ${per.map((n) => `<td>${n || ""}</td>`).join("")}
-        <td><b>${total}</b></td><td>${count(p, (m) => m.status === "spilt") || ""}</td>
-        <td class="${abs(p, "declined") ? "absc" : ""}">${abs(p, "declined") || ""}</td><td class="${abs(p, "noshow") ? "absc" : ""}">${abs(p, "noshow") || ""}</td></tr>`;
+        <td><b>${invited}</b></td><td>${yes}</td><td>${count(p, (m) => m.status === "spilt") || ""}</td>
+        <td class="${declined ? "absc" : ""}">${declined || ""}</td><td class="${noshow ? "absc" : ""}">${noshow || ""}</td></tr>`;
     }).join("");
 
   // Matrise: spillere × kamper (innbyttere vises svakere når kampen har oppstilling)
