@@ -314,3 +314,7 @@ body[data-role="reader"] .slot, body[data-role="reader"] .chip { cursor: default
 body:has(#demoBanner:not([hidden])) #chat:not([hidden]) { height: calc(100dvh - 225px); }
 #tabs .tab-ico { display: none; }
 @media (max-width: 480px) { #tabs .tab-ico { display: inline; } #tabs .tab-lbl { display: none; } }
+/* Avbud-kolonnene: gul bakgrunn i hele kolonnen, sterkere der det er avbud */
+.stats .abscol { background: #fef3c7; color: #713f12; }
+.stats th.abscol { background: #fde047; }
+.stats td.abscol.absc { background: #facc15; font-weight: 700; }
