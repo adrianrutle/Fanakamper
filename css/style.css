@@ -318,3 +318,6 @@ body:has(#demoBanner:not([hidden])) #chat:not([hidden]) { height: calc(100dvh - 
 .stats .abscol { background: #fef3c7; color: #713f12; }
 .stats th.abscol { background: #fde047; }
 .stats td.abscol.absc { background: #facc15; font-weight: 700; }
+.matrix th.col .opp { display: block; max-width: 72px; margin: 2px auto 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-weight: 600; font-size: 12px; }
+.matrix th.col .venue { font-size: 11px; }

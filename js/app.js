@@ -787,7 +787,8 @@ function renderStats() {
   // Hver kampkolonne viser dato, lag, bane og antall i troppen.
   $("#matrix").innerHTML = `<tr><th><div class="pcell">Spiller <span class="nbadge head" title="Antall kamper">Kamper</span></div></th>${cols.map((m) =>
       `<th class="col team-col-${esc(m.team)}" title="${esc(m.team)} ${m.homeAway === "Borte" ? "@" : "vs"} ${esc(m.opponent)}${m.venue ? " · " + esc(m.venue) : ""} · ${nPlay(m)} uttatt${nAbsM(m) ? ` · ${nAbsM(m)} avbud` : ""}">
-        ${m.date ? m.date.slice(8, 10) + "." + m.date.slice(5, 7) : "?"}<br><small>${esc(m.team[0])}</small>
+        ${m.date ? m.date.slice(8, 10) + "." + m.date.slice(5, 7) : "?"} <small>${esc(m.team[0])}</small>
+        <span class="opp">${m.homeAway === "Borte" ? "@ " : ""}${esc(m.opponent || "?")}</span>
         <span class="venue">${esc(m.venue || "–")}</span>
         <span class="cnts">${nAbsM(m) ? `<span class="cnt abs" title="Avbud: avslo eller møtte ikke">${nAbsM(m)}</span>` : ""}<span class="cnt${nPlay(m) ? "" : " empty"}${prop(m) ? " prop" : ""}" title="Uttatt uten avbud">${nPlay(m)}</span></span></th>`).join("")}</tr>` +
     players.map((p) => {
